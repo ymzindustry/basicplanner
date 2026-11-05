@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main application theme. -->
+    <style name="Theme.GymTracker" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Theme for the splash screen window to avoid the white screen. -->
+    <style name="Theme.App.Splash" parent="Theme.GymTracker">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

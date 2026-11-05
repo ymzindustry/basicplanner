@@ -1,0 +1,171 @@
+@startuml data_structure
+' BasicPlanner — Data / entity structure
+' Entities: Program → Block → Week → Day → TimedSession → Session → Exercise → SetEntry
+
+
+
+class AppState {
+  + programs: List<ProgramEntity>
+  + blocks: List<BlockEntity>
+  + weeks: List<WeekEntity>
+  + days: List<DayEntity>
+  + timedSessions: List<TimedSessionEntity>
+  + sessions: List<SessionEntity>
+  + exercises: List<ExerciseEntity>
+  + movements: List<MovementEntity>
+  + activePrograms: List<ActiveProgram>
+  + performanceEntries: List<PerformanceEntry>
+  + items: List<Item>
+  + itemFamilies: List<ItemFamily>
+}
+
+class ProgramEntity {
+  + id: Long
+  + name: String
+  + owner: String?
+  + blockIds: MutableList<Long>
+  + adjustmentPercent: Int = 0
+}
+
+class BlockEntity {
+  + id: Long
+  + name: String
+  + owner: String?
+  + weekIds: MutableList<Long>
+  + subBlockIds: MutableList<Long>
+  + adjustmentPercent: Int = 0
+}
+
+class WeekEntity {
+  + id: Long
+  + name: String
+  + owner: String?
+  + dayIds: MutableList<Long>   ' 7 slots, REST_DAY_ID = -1
+  + adjustmentPercent: Int = 0
+}
+
+class DayEntity {
+  + id: Long
+  + name: String
+  + owner: String?
+  + timedSessionIds: MutableList<Long>
+  + adjustmentPercent: Int = 0
+}
+
+class TimedSessionEntity {
+  + id: Long
+  + name: String
+  + time: LocalTime
+  + sessionId: Long
+}
+
+class SessionEntity {
+  + id: Long
+  + name: String
+  + owner: String?
+  + exerciseIds: MutableList<Long>
+  + baseRms: Map<Long, Int>?      ' movementId → base RM
+  + date: LocalDateTime?
+  + percent: Float
+  + adjustmentPercent: Int = 0
+}
+
+class ExerciseEntity {
+  + id: Long
+  + movementId: Long
+  + name: String
+  + entries: MutableList<SetEntry>
+}
+
+class SetEntry {
+  + id: Long
+  + sets: Int
+  + reps: Int
+  + intensity: Int   ' % of base RM
+  + rest: Int        ' seconds
+  + finished: Boolean? = null
+}
+
+class MovementEntity {
+  + id: Long
+  + name: String
+  + owner: String?
+}
+
+class ActiveProgram {
+  + id: Long
+  + programId: Long
+  + startDate: LocalDate
+  + name: String
+  + sessionIds: List<Long>
+  + exerciseDailyRms: Map<Long, List<Int>>  ' interpolation strategy
+}
+
+class PerformanceEntry {
+  + id: Long
+  + movementId: Long
+  + activeProgramId: Long
+  + date: LocalDate
+  + weightKg: Double
+  + reps: Int = 1
+  + note: String = ""
+  + sessionId: Long? = null   ' auto entries tagged; deleted with session
+}
+
+class ItemFamily {
+  + id: Long
+  + name: String
+  + type: INT | STR | IMAGE | VIDEO
+}
+
+class Item {
+  + id: Long
+  + entityId: Long
+  + activeProgramId: Long?
+  + family: ItemFamily
+  + value: String
+}
+
+AppState *-- ProgramEntity : programs
+AppState *-- ActiveProgram
+AppState *-- PerformanceEntry
+AppState *-- Item
+AppState *-- ItemFamily
+
+ProgramEntity "1" *-- "0..*" BlockEntity : blockIds
+BlockEntity "1" *-- "0..*" BlockEntity : subBlockIds (nested, no cycles)
+BlockEntity "1" *-- "0..*" WeekEntity : weekIds
+WeekEntity "1" *-- "0..7" DayEntity : dayIds (REST = -1)
+DayEntity "1" *-- "0..*" TimedSessionEntity : timedSessionIds
+TimedSessionEntity "many" --> "1" SessionEntity : sessionId
+SessionEntity "1" *-- "0..*" ExerciseEntity : exerciseIds
+ExerciseEntity "many" --> "1" MovementEntity : movementId
+ExerciseEntity "1" *-- "0..*" SetEntry : entries
+ActiveProgram "1" --> "1" ProgramEntity : programId
+ActiveProgram "0..*" *-- "0..*" SessionEntity : sessionIds
+PerformanceEntry "many" --> "1" MovementEntity
+PerformanceEntry "many" --> "1" ActiveProgram : activeProgramId
+Item "many" --> "1" ItemFamily
+Item : hangs on any entity (entityId)
+
+note right of BlockEntity
+  A block can contain other blocks
+  AND/OR weeks. Cycle prevention:
+  a block can never be its own
+  descendant (blockDescendants()).
+end note
+
+note bottom of ActiveProgram
+  exerciseDailyRms = base RM per day
+  (fixed base, updated only by the
+  user or the interpolation strategy).
+  Adjustment % is view-only.
+end note
+
+note bottom of PerformanceEntry
+  One entry per (reps → max kg) per
+  movement; only finished sets.
+  bestWeightPerReps() groups by reps.
+end note
+
+@enduml

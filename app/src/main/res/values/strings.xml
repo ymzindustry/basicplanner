@@ -1,0 +1,375 @@
+<resources>
+    <string name="app_name">Basic Planner</string>
+    <string name="add">Add</string>
+    <string name="more">+</string>
+    <string name="freq">Freq.</string>
+    <string name="rest_over">Rest over!</string>
+    <string name="its_time_for_next_set">It\'s time for your next set.</string>
+    <string name="ok">OK</string>
+    <string name="session_not_found">Session not found</string>
+    <string name="finish">Finish</string>
+    <string name="base_rm">Base: %1$d kg</string>
+    <string name="set_header">SET</string>
+    <string name="reps_header">REPS</string>
+    <string name="kg_header">KG</string>
+    <string name="rest_header">REST</string>
+    <string name="intensity_percent_format">%s%%</string>
+    <string name="rest">rest</string>
+    <string name="action_copy">Copy</string>
+    <string name="days">Days :</string>
+    <string name="sessions">Sessions :</string>
+    <string name="exercises">Exercises :</string>
+    <string name="weeks">Weeks :</string>
+    <string name="blocks">Blocks :</string>
+    <string name="info">Info</string>
+    <string name="description_title">Description</string>
+    <string name="set">set</string>
+
+
+
+    <string name="agenda_settings">Settings</string>
+    <string name="agenda_create">Create</string>
+    <string name="agenda_select_exercise">Select Exercise</string>
+    <string name="agenda_select_exercise_to_edit">Select Exercise to Edit</string>
+    <string name="agenda_unknown_exercise">Unknown</string>
+    <string name="agenda_no_active_program">No active program</string>
+    <string name="agenda_no_active_program_message">"No active program selected.\nUse the selector to associate one."</string>
+    <string name="agenda_validate">Validate</string>
+    <string name="agenda_edit_base_rm">Edit Base RM</string>
+    <string name="agenda_import_successful">Import successful!</string>
+    <string name="agenda_import_failed">Import failed: %1$s</string>
+    <string name="agenda_export_csv_success">JSON export successful</string>
+    <string name="agenda_export_csv_failed">JSON export failed</string>
+
+    <string name="dialog_start_new_session">Start New</string>
+    <string name="dialog_date_format">EEEE d MMMM</string>
+
+
+    <string name="dialog_import_request_type">*/*</string>
+    <string name="dialog_export_bpent_success">Program exported to Downloads</string>
+    <string name="dialog_export_bpent_failed">Export failed</string>
+    <string name="dialog_export_excel_success">Excel Export finished</string>
+    <string name="dialog_export_excel_error">Excel Export error</string>
+
+
+    <string name="dialog_change_name_initial_empty"></string>
+
+    <string name="creation_filter_by_owner">Filter by owner</string>
+    <string name="creation_all_owners">All Owners</string>
+    <string name="creation_create_entity">Create entity</string>
+    <string name="creation_no_entities">No %1$s at this time.</string>
+    <string name="creation_composition_to_be_completed">To be completed</string>
+    <string name="creation_composition_days_to_be_completed">0 day|||To be completed</string>
+    <string name="creation_composition_days_plural">{count, plural, one{# day} other{# days}}|||To be completed</string>
+    <string name="creation_composition_plural">{count, plural, one{# %1$s} other{# %1$s}}</string>
+    <string name="creation_dialog_title">CREATE/EDIT %1$s</string>
+
+    <string name="creation_to_be_completed">To be completed</string>
+
+
+    <string name="sub_entity_kind_set_singular">Set</string>
+    <string name="sub_entity_kind_exercise_singular">Exercise</string>
+    <string name="sub_entity_kind_session_singular">Session</string>
+    <string name="sub_entity_kind_day_singular">Day</string>
+    <string name="sub_entity_kind_week_singular">Week</string>
+    <string name="sub_entity_kind_element_singular">Element</string>
+    <string name="sub_entity_kind_block_singular">Block</string>
+
+
+    <plurals name="creation_composition_items">
+        <item quantity="one">%1$d %2$s</item>
+        <item quantity="other">%1$d %2$ss</item>
+    </plurals>
+
+
+    <string name="agenda_view_month_year_format">%1$s %2$d</string>
+    <string name="agenda_view_more_sessions_format">+%1$d more</string>
+
+
+    <string name="day_monday_short">Mon</string>
+    <string name="day_tuesday_short">Tue</string>
+    <string name="day_wednesday_short">Wed</string>
+    <string name="day_thursday_short">Thu</string>
+    <string name="day_friday_short">Fri</string>
+    <string name="day_saturday_short">Sat</string>
+    <string name="day_sunday_short">Sun</string>
+    <string name="rest_day_name">Rest Day</string>
+    <string-array name="months_short">
+        <item>Jan</item>
+        <item>Feb</item>
+        <item>Mar</item>
+        <item>Apr</item>
+        <item>May</item>
+        <item>Jun</item>
+        <item>Jul</item>
+        <item>Aug</item>
+        <item>Sep</item>
+        <item>Oct</item>
+        <item>Nov</item>
+        <item>Dec</item>
+    </string-array>
+
+
+
+    <string name="dialog_ok">OK</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="dialog_close">Close</string>
+    <string name="dialog_save">Save</string>
+
+
+    <string name="dialog_select_time">Select time</string>
+
+    <string name="dialog_structure">Structure</string>
+    <string name="dialog_ongoing_sessions">Ongoing Sessions</string>
+    <string name="dialog_expand_ongoing_sessions_desc">Expand ongoing sessions</string>
+
+    <string name="dialog_create">Create</string>
+    <string name="dialog_edit">Edit</string>
+    <string name="dialog_unknown">Unknown</string>
+    <string name="dialog_movement">Movement</string>
+    <string name="dialog_select">Select</string>
+    <string name="dialog_select_placeholder">Select…</string>
+    <string name="dialog_variant">Variant</string>
+    <string name="dialog_name">Name</string>
+    <string name="dialog_composition">Composition :</string>
+    <string name="dialog_composition_empty">Empty.</string>
+    <string name="dialog_set">Set</string>
+    <string name="adjustment_percent_label">Adjustment (%)</string>
+    <string name="adjustment_percent_short_label">%</string>
+    <string name="sub_adjustments_title">Per-child adjustment (%)</string>
+    <string name="timer_channel_ongoing_name">Rest timer</string>
+    <string name="timer_channel_done_name">Rest finished</string>
+    <string name="timer_ongoing_title">Rest timer</string>
+    <string name="timer_ongoing_text">Rest: %s</string>
+    <string name="timer_ongoing_label_text">%1$s · %2$s</string>
+    <string name="timer_done_title">Rest finished</string>
+    <string name="timer_done_text">Your rest is over — next set!</string>
+    <string name="timer_done_label_text">Rest over: %s</string>
+    <string name="timer_time_mm_ss">%1$d:%2$02d</string>
+    <string name="timer_time_ss">%d s</string>
+    <string name="dialog_rep">Rep</string>
+    <string name="dialog_intensity_percent">%</string>
+    <string name="dialog_rest_sec">Sec</string>
+    <string name="dialog_day_prefix_mon">Mon.</string>
+    <string name="dialog_day_prefix_tue">Tue.</string>
+    <string name="dialog_day_prefix_wed">Wed.</string>
+    <string name="dialog_day_prefix_thu">Thu.</string>
+    <string name="dialog_day_prefix_fri">Fri.</string>
+    <string name="dialog_day_prefix_sat">Sat.</string>
+    <string name="dialog_day_prefix_sun">Sun.</string>
+    <string name="dialog_index_prefix">%1$d.</string>
+    <string name="dialog_delete_last">Delete</string>
+    <string name="dialog_add_entry">Add</string>
+    <string name="dialog_available_elements">Available elements</string>
+    <string name="dialog_week_limit_reached">Limit reached (7 days).</string>
+    <string name="dialog_icon_add_desc">Add</string>
+    <string name="dialog_icon_close_desc">Close</string>
+
+
+    <string name="settings_title">Settings &amp; Data</string>
+    <string name="settings_change_user_name">Change User Name</string>
+    <string name="settings_import_program">Import Program</string>
+    <string name="settings_sharing">Sharing…</string>
+    <string name="settings_share_program">Share Program</string>
+    <string name="settings_exporting">Exporting…</string>
+    <string name="settings_export_to_excel">Export to Excel</string>
+    <string name="settings_export_to_csv">Export to JSON</string>
+    <string name="settings_exporting_csv">Exporting JSON…</string>
+    <string name="settings_generate_data">Generate Data</string>
+    <string name="settings_reset_all_data">Reset All Data</string>
+    <string name="settings_tutorial">Tutorial</string>
+    <string name="tutorial_step_counter">Step %1$d / %2$d</string>
+    <string name="tutorial_skip">Skip</string>
+    <string name="tutorial_back">Back</string>
+    <string name="tutorial_next">Next</string>
+    <string name="tutorial_done">Finish</string>
+    <string name="tutorial_welcome_title">Welcome to BasicPlanner!</string>
+    <string name="tutorial_welcome_body">Hi! Welcome to BasicPlanner — your personal training planner. We will start the tutorial. First of all, right now you are on the Agenda screen, but we will come back here in a few minutes. Press Next to continue.</string>
+    <string name="tutorial_create_title">Create your first program</string>
+    <string name="tutorial_create_body">So now we are on the Agenda screen. But first of all, let\'s create our first program: click on the + button (see the arrow).</string>
+    <string name="tutorial_creation_title">The Creation screen</string>
+    <string name="tutorial_creation_body">You are now on the Creation screen. To create your first exercise, click on the + button (see the arrow).</string>
+    <string name="tutorial_type_title">1. Choose the type</string>
+    <string name="tutorial_type_body">In the dialog, choose \'Exercise\' as the type of entity you want to create.</string>
+    <string name="tutorial_movement_title">2. Name &amp; movement</string>
+    <string name="tutorial_movement_body">Give your exercise a name (e.g. \'Bench Press\'), then select the movement it trains.</string>
+    <string name="tutorial_sets_title">3. Add your sets</string>
+    <string name="tutorial_sets_body">Add your sets: reps and intensity (%). The suggested weight is calculated automatically. Then press Save — your first exercise is ready!</string>
+    <string name="change_name_title">Edit User Name</string>
+    <string name="change_name_label">Your Name</string>
+    <string name="value_dialog_title">Value</string>
+    <string name="edit">Edit</string>
+    <string name="delete">Delete</string>
+    <string name="unknown">Unknown</string>
+    <string name="back">Back</string>
+    <string name="next">Next</string>
+    <string name="close">Close</string>
+    <string name="update">Update</string>
+    <string name="create">Create</string>
+    <string name="selector_switch_program_desc">Switch program</string>
+    <string name="ps_select_active_program_title">Select Active Program</string>
+    <string name="ps_options_desc">Options</string>
+    <string name="ps_associate">Associate</string>
+    <string name="ps_no_active_programs">No active programs yet.</string>
+    <string name="ps_to_be_updated">To be updated</string>
+
+
+
+    <string name="ps_select_program_title">Select a program</string>
+    <string name="ps_no_programs_message">First create at least one program.</string>
+
+
+    <string name="ps_configure_program_title">Configure Program</string>
+    <string name="ps_update_button">Update</string>
+    <string name="ps_program_name_label">Program Name</string>
+    <string name="ps_start_date_label">Start Date</string>
+    <string name="ps_pick_date_desc">Pick date</string>
+    <string name="ps_load_progression_title">Your goals (Base in Kg)</string>
+
+
+    <string name="ps_rm_start_label">Start</string>
+    <string name="ps_rm_target_label">Target</string>
+    <string name="ps_rm_freq_label">Freq.</string>
+    <string name="ps_strategy_select_desc">Select frequency strategy</string>
+
+
+    <string name="ps_datepicker_title">Select program start date</string>
+
+
+    <string name="session_rest_over">Rest Over!</string>
+    <string name="session_next_set_prompt">It\'s time for your next set.</string>
+    <string name="session_ok">OK</string>
+    <string name="session_finish">Finish</string>
+    <string name="session_add_set">Add set</string>
+    <string name="session_add_set_title">Add set</string>
+    <string name="session_add_set_sets_label">Sets</string>
+    <string name="session_add_set_reps_label">Reps</string>
+    <string name="session_add_set_kg_label">Weight (kg)</string>
+    <string name="session_add_set_rest_label">Rest (s)</string>
+    <string name="session_add_set_confirm">Add</string>
+    <string name="session_delete_set">Delete set</string>
+    <string name="tutorial_target_movement_title">Movement</string>
+    <string name="tutorial_target_movement_body">Tap here to pick the movement this exercise trains (for example Bench Press).</string>
+    <string name="tutorial_target_variant_title">Variant</string>
+    <string name="tutorial_target_variant_body">Give this version of the movement a name (for example “Close grip”). It is optional, but it helps you tell your variants apart.</string>
+    <string name="tutorial_target_sets_title">Sets</string>
+    <string name="tutorial_target_sets_body">Tap Add to create a set row, then fill in the four values (sets, reps, intensity %, rest) and close the keyboard. OK unlocks once the four are filled.</string>
+    <string name="tutorial_target_ok_title">Create</string>
+    <string name="tutorial_target_ok_body">Happy with your exercise? Tap OK to save it — your first exercise is ready.</string>
+    <string name="tutorial_got_it">Got it</string>
+
+
+    <string name="user_default_name">User</string>
+
+
+    <string name="entity_kind_movement">Movement</string>
+    <string name="entity_kind_exercise">Exercise</string>
+    <string name="entity_kind_session">Session</string>
+    <string name="entity_kind_day">Day</string>
+    <string name="entity_kind_week">Week</string>
+    <string name="entity_kind_block">Block</string>
+    <string name="entity_kind_program">Program</string>
+
+
+    <string name="sub_entity_kind_none">None</string>
+    <string name="sub_entity_kind_set">Set</string>
+    <string name="sub_entity_kind_exercise">Exercise</string>
+    <string name="sub_entity_kind_session">Session</string>
+    <string name="sub_entity_kind_day">Day</string>
+    <string name="sub_entity_kind_week">Week</string>
+    <string name="sub_entity_kind_block">Block</string>
+
+
+    <string name="interpolation_strategy_day">Day</string>
+    <string name="interpolation_strategy_week">Week</string>
+    <string name="interpolation_strategy_block">Block</string>
+    <string name="interpolation_strategy_block_level">Block level %1$d</string>
+    <string name="interpolation_strategy_custom">Custom</string>
+    <string name="interpolation_strategy_const">Const</string>
+
+
+    <string name="entity_row_expand_structure_desc">Expand Structure</string>
+    <string name="entity_row_options_desc">Options</string>
+    <string name="entity_tree_base_rm_display">Base: %1$d</string>
+    <string name="entity_tree_base_update_needed">Base update needed</string>
+    <string name="exercise_set_content_kg_format">%1$d kg</string>
+    <string name="exercise_set_content_format">%1$d x %2$d @ %3$s - %4$d s</string>
+    <string name="ongoing_session_started_at">Started at %1$s</string>
+    <string name="ongoing_session_resume_desc">Resume</string>
+    <string name="set_row_done_desc">Done</string>
+    <string name="time_format_hm">HH:mm</string>
+
+    <string name="excel_sheet_training_plan">Training_Plan</string>
+    <string name="excel_sheet_base_database">Base_Database</string>
+    <string name="excel_column_date">Date</string>
+    <string name="excel_unknown_movement">Unknown</string>
+    <string name="excel_week_prefix">WEEK</string>
+    <string name="excel_date_range_separator"> -- </string>
+    <string name="excel_rest_day_label">Rest Day</string>
+    <string name="excel_exercise_label_separator">: </string>
+    <string name="excel_sets_reps_separator"> * </string>
+    <string name="excel_reps_intensity_separator"> \@ </string>
+    <string name="excel_kg_rest_separator">kg - </string>
+    <string name="excel_seconds_suffix">s</string>
+    <string name="excel_filename_from_prefix">_from_</string>
+    <string name="excel_filename_space_replacement">_</string>
+    <string name="excel_movement_unknown_short">Inconnu</string>
+    <string name="excel_session_separator">----------</string>
+    <string name="excel_variant_name_format">(%1$s)</string>
+
+    <string name="manage_item_families">Items</string>
+    <string name="create_item_family">Create Item Family</string>
+    <string name="edit_item_family">Edit Item Family</string>
+    <string name="all">All</string>
+    <string name="items_attached">Attached</string>
+    <string name="items_not_attached">Not attached</string>
+    <string name="items_none_attached">Nothing attached yet.</string>
+    <string name="items_none_available">Every item is already attached.</string>
+    <string name="items_remove_title">Remove item?</string>
+    <string name="items_remove_message">The item will be detached from this element.</string>
+    <string name="items_attach_hint">Tap an item below to attach it.</string>
+    <string name="description">Description</string>
+    <string name="type">Type</string>
+    <string name="item_family_management">Item Family Management</string>
+
+    <string name="hanged_items_on">Hanged items</string>
+    <string name="hang_new_item">Hang new item</string>
+    <string name="create_item">Create Item</string>
+    <string name="hang">Hang</string>
+    <string name="view_image">View Image</string>
+    <string name="play_video">Play Video</string>
+
+    <string name="no_file_selected">No file selected</string>
+    <string name="select_image">Select Image</string>
+    <string name="select_video">Select Video</string>
+    <string name="default_value">Default Value</string>
+
+    <string name="dashboard_title">Progress</string>
+    <string name="dashboard_open">Open progress dashboard</string>
+    <string name="dashboard_add_performance">Add performance</string>
+    <string name="dashboard_no_movements">Create a movement first to track progress.</string>
+    <string name="dashboard_no_program">No program attached to the agenda. Attach one to see progress data.</string>
+    <string name="dashboard_no_entries">No performance yet. Add your first lift.</string>
+    <string name="dashboard_latest">Latest</string>
+    <string name="dashboard_best">Best</string>
+    <string name="dashboard_progress">Progress</string>
+    <string name="dashboard_entries">History</string>
+    <string name="dashboard_weight_kg">Weight (kg)</string>
+    <string name="dashboard_reps">Reps</string>
+    <string name="dashboard_variant_filter">Variant</string>
+    <string name="dashboard_variant_all">All variants</string>
+    <string name="dashboard_variant_title">Variant</string>
+
+    <string name="confirm_delete_title">Delete?</string>
+    <string name="confirm_delete_message">This action cannot be undone.</string>
+    <string name="confirm_reset_title">Reset all data?</string>
+    <string name="confirm_reset_message">All programs, sessions, items and progress will be deleted.</string>
+    <string name="week_day_empty">—</string>
+    <string name="dialog_new_exercise">New exercise</string>
+    <string name="items_sort_alpha">A-Z</string>
+    <string name="items_sort_type">Type</string>
+    <string name="dashboard_bands_level">Lvl %1$d</string>
+    <string name="dashboard_bands_weeks">Weeks</string>
+    <string name="dashboard_bands_title">Bands on the chart</string>
+    <string name="items_none_families">No items defined yet. Use + to create one.</string>
+</resources>

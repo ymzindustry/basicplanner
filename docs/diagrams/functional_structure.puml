@@ -1,0 +1,71 @@
+@startuml functional_structure
+' BasicPlanner — Functional structure (screens & flows)
+' app: com.ymz.basicplanner (Kotlin + Jetpack Compose)
+
+
+skinparam componentStyle rectangle
+skinparam DefaultTextAlignment center
+
+actor User
+
+rectangle "MainActivity\n(navigation hub, 1st-launch seed)" as MAIN {
+  rectangle "ProgramAgendaScreen\n(calendar, sessions, exports)" as AGENDA
+  rectangle "CreationScreen\n(entity lists + trees)" as CREATION
+  rectangle "SessionScreen\n(workout execution)" as SESSION
+  rectangle "DashboardScreen\n(perf analysis, read-only)" as DASH
+}
+
+MAIN --> AGENDA
+MAIN --> CREATION
+MAIN --> DASH
+AGENDA --> SESSION : "start / resume\nsession"
+CREATION --> SESSION : "start session"
+
+rectangle "Shared composables & dialogs" as SHARED {
+  rectangle "UniversalEntityInfoDialog\n(tree explorer: Program→Block→Week→Day→Session→Exercise)" as INFO
+  rectangle "EntityEditDialog\n(name + Adjustment % + composition)" as EDIT
+  rectangle "OngoingSessionsDialog\n(progress circles, resume/delete)" as ONGOING
+  rectangle "ItemManagementDialog\n(attach items: RPE, Note, media)" as ITEMS
+  rectangle "ConfirmActionDialog\n(destructive confirmations)" as CONFIRM
+}
+
+AGENDA --> INFO
+CREATION --> INFO
+AGENDA --> EDIT
+CREATION --> EDIT
+AGENDA --> ONGOING
+AGENDA --> ITEMS
+SESSION --> ITEMS
+CREATION --> CONFIRM
+AGENDA --> CONFIRM
+
+rectangle "Services / export / persistence" as BACK {
+  rectangle "TimerService\n(foreground rest timer + notifications)" as TIMER
+  rectangle "JsonExporter\n(program_full.json + notification)" as JSON
+  rectangle "ExcelExporter\n(.xlsx + notification)" as XLSX
+  rectangle "EntityFileConverter\n(.bpent share + notification)" as BPENT
+  rectangle "AppStateStore\n(DataStore persistence)" as STORE
+}
+
+SESSION --> TIMER : "start rest\ncountdown"
+AGENDA --> JSON
+AGENDA --> XLSX
+AGENDA --> BPENT
+AGENDA --> STORE
+CREATION --> STORE
+SESSION --> STORE : "auto perf\nrecording"
+
+note bottom of TIMER
+  Rest timer keeps running in
+  background; posts "Rest finished"
+  notification when done.
+end note
+
+note bottom of SESSION
+  Close button & system Back →
+  recordSessionBestPerformances()
+  (best kg per reps, finished sets only,
+  tagged with sessionId) + save.
+end note
+
+@enduml
