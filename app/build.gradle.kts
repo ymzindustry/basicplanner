@@ -42,10 +42,17 @@ android {
     buildFeatures {
         compose = true
     }
+    // Compress the bundled native libs (Python) so the APK stays under file-sharing limits;
+    // they are extracted at install time instead of being mmapped from the APK.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
     // Python runtime for user modules. Only the ABIs the app actually ships.
     defaultConfig {
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            abiFilters += listOf("arm64-v8a")
         }
     }
     chaquopy {
