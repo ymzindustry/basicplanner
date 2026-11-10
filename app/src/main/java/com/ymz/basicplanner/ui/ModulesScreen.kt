@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ymz.basicplanner.compose.CommonBottomBar
@@ -98,14 +99,34 @@ fun ModulesScreen(
     Scaffold(
         containerColor = DarkBackground,
         contentColor = TextPrimary,
-        bottomBar = {
-            CommonBottomBar(
-                leftButtons = {
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // Same header geometry as the editor: equal slots left/right so the title is centred.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "back", tint = AccentOrange)
                     }
-                },
-                rightButtons = {
+                }
+                Text(
+                    text = "Modules",
+                    color = AccentOrange,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+                Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
                     IconButton(onClick = {
                         val newModule = ModuleDefinition(
                             id = creationState.newId(),
@@ -119,15 +140,7 @@ fun ModulesScreen(
                         Icon(Icons.Default.Add, "new module", tint = AccentOrange)
                     }
                 }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            CommonHeader(centerContent = { ScrollingText(text = "Modules") })
+            }
 
             if (creationState.modules.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -150,8 +163,8 @@ fun ModulesScreen(
                             attachments = attachments,
                             attachmentLabel = { attachment ->
                                 val target = attachmentLabel(creationState, attachment)
-                                val program = creationState.programs.find { it.id == attachment.programId }?.name ?: ""
-                                "$program · $target"
+                                val program = creationState.programs.find { it.id == attachment.programId }?.name
+                                listOfNotNull(program, target).joinToString(" · ")
                             },
                             onEdit = { editingModuleId = module.id },
                             onAttach = { attachingTo = module },

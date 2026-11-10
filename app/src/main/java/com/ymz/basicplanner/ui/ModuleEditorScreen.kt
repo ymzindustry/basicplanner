@@ -1,8 +1,6 @@
 package com.ymz.basicplanner.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,20 +8,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,12 +35,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ymz.basicplanner.compose.CommonBottomBar
-import com.ymz.basicplanner.compose.CommonHeader
-import com.ymz.basicplanner.compose.MarqueeText
-import com.ymz.basicplanner.compose.ScrollingText
 import com.ymz.basicplanner.data.AppStateStore
 import com.ymz.basicplanner.data.PythonModuleExecutor
 import com.ymz.basicplanner.model.CreationState
@@ -52,8 +47,9 @@ import com.ymz.basicplanner.model.module.ModuleDefinition
 import com.ymz.basicplanner.model.module.ModuleInputSpec
 import kotlinx.coroutines.launch
 
-private val CODE_LINE_HEIGHT = 18.sp
-private val CODE_LINE_BOX = 18.dp
+private val EDITOR_BG = Color(0xFF0D0D0D)
+private val EDITOR_FIELD = Color(0xFF161616)
+private val CODE_LINE_HEIGHT = 19.sp
 
 /** `Deadlift form` → `deadlift_form.py`, so the module reads like a real file. */
 fun moduleFileName(name: String): String {
@@ -65,13 +61,12 @@ fun moduleFileName(name: String): String {
 }
 
 /**
- * Full-page module editor, presented as a Python file: file name in the header, a comment block
- * carrying the metadata, the code filling the page, and the run/save actions in the bottom bar.
+ * Full-page module editor, shaped like a Python file: file name centred in the header, one card
+ * holding the file's metadata then its code, and run/save at the bottom.
  *
  * Format constraints (they come from the runtime, not from taste):
- * - the file must define `apply(ctx)`; saving is refused otherwise;
- * - inputs are declared as `name:type` and become the keys of `ctx["items"]`;
- * - one statement per line (Python), so the line gutter stays aligned.
+ * - the file must define `apply(ctx)`, otherwise saving is refused;
+ * - inputs are declared `name:type` and become the keys of `ctx["items"]`.
  */
 @Composable
 fun ModuleEditorScreen(
@@ -127,117 +122,114 @@ fun ModuleEditorScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(EDITOR_BG)
     ) {
-        CommonHeader(
-            centerContent = { ScrollingText(text = fileName) },
-            startContent = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "back", tint = AccentOrange)
-                }
-            }
-        )
-
-        // File metadata, shown like the header comment of a .py file.
+        // Header: equal 48dp slots on both sides so the file name sits exactly in the middle.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+                .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "PY",
-                color = DarkBackground,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(AccentOrange)
-                    .padding(horizontal = 5.dp, vertical = 1.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "def apply(ctx) → list of set deltas",
-                color = TextMuted,
-                fontSize = 11.sp,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = if (hasApply) "valid" else "missing apply(ctx)",
-                color = if (hasApply) AccentGreen else AccentRed,
-                fontSize = 10.sp
-            )
-        }
-
-        // Metadata block: name, description, declared inputs.
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(DarkSurfaceAlt)
-                .padding(8.dp)
-        ) {
-            CodeField(
-                label = "# name",
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true
-            )
-            Spacer(Modifier.height(6.dp))
-            CodeField(
-                label = "# description",
-                value = description,
-                onValueChange = { description = it },
-                singleLine = true
-            )
-            Spacer(Modifier.height(6.dp))
-            CodeField(
-                label = "# inputs (name:type, …)",
-                value = inputsText,
-                onValueChange = { inputsText = it },
-                singleLine = true
-            )
-        }
-
-        Spacer(Modifier.height(6.dp))
-
-        // The code itself, with a line-number gutter.
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 8.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF111111))
-                .border(1.dp, TextMuted.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-        ) {
-            val lineCount = code.count { it == '\n' } + 1
-            val scroll = rememberScrollState()
-            Column(
-                modifier = Modifier
-                    .background(Color(0xFF0B0B0B))
-                    .padding(horizontal = 6.dp, vertical = 8.dp)
-                    .verticalScroll(scroll)
-            ) {
-                repeat(lineCount) { index ->
-                    Text(
-                        text = "${index + 1}",
-                        color = TextMuted.copy(alpha = 0.6f),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        lineHeight = CODE_LINE_HEIGHT,
-                        modifier = Modifier.heightIn(min = CODE_LINE_BOX)
+            Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "back",
+                        tint = AccentOrange
                     )
                 }
             }
+            Text(
+                text = fileName,
+                color = AccentOrange,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (hasApply) AccentGreen else AccentRed)
+                )
+            }
+        }
 
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)          // keep room for the bottom bar instead of eating the screen
+                .padding(horizontal = 12.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(EDITOR_FIELD)
+        ) {
+            // File strip: language, contract, validity.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "PY",
+                    color = EDITOR_BG,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(AccentOrange)
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = if (hasApply) "apply(ctx) → set deltas" else "missing def apply(ctx)",
+                    color = if (hasApply) TextMuted else AccentRed,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            DividerLine()
+
+            // Metadata, written the way it would be at the top of the file.
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                CodeInput(
+                    label = "# name",
+                    value = name,
+                    onValueChange = { name = it }
+                )
+                Spacer(Modifier.height(10.dp))
+                CodeInput(
+                    label = "# description",
+                    value = description,
+                    onValueChange = { description = it }
+                )
+                Spacer(Modifier.height(10.dp))
+                CodeInput(
+                    label = "# inputs   (form:int, sleep:float, …)",
+                    value = inputsText,
+                    onValueChange = { inputsText = it }
+                )
+            }
+
+            DividerLine()
+
+            // Code.
             BasicTextField(
                 value = code,
                 onValueChange = { code = it },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 textStyle = TextStyle(
                     color = TextPrimary,
                     fontFamily = FontFamily.Monospace,
@@ -245,44 +237,49 @@ fun ModuleEditorScreen(
                     lineHeight = CODE_LINE_HEIGHT
                 ),
                 cursorBrush = SolidColor(AccentOrange),
-                // Keep tabs literal and the caret visible while the keyboard is open.
                 decorationBox = { inner ->
                     Box {
                         if (code.isEmpty()) {
                             Text(
-                                "# write python here\n" + ModuleDefinition.DEFAULT_CODE,
-                                color = TextMuted.copy(alpha = 0.5f),
+                                text = ModuleDefinition.DEFAULT_CODE,
+                                color = TextMuted.copy(alpha = 0.55f),
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp
+                                fontSize = 12.sp,
+                                lineHeight = CODE_LINE_HEIGHT
                             )
                         }
                         inner()
                     }
                 }
             )
-        }
 
-        result?.let { output ->
-            Text(
-                text = output,
-                color = if (output.startsWith("ERROR")) AccentRed else AccentGreen,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 10.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    .heightIn(max = 80.dp)
-            )
+            result?.let { output ->
+                DividerLine()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = output,
+                        color = if (output.startsWith("ERROR")) AccentRed else AccentGreen,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { result = null }) {
+                        Text("hide", color = TextMuted, fontSize = 10.sp)
+                    }
+                }
+            }
         }
 
         CommonBottomBar(
             leftButtons = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "back", tint = AccentOrange)
-                }
-            },
-            rightButtons = {
-                IconButton(onClick = {
+                TextButton(onClick = {
                     result = try {
                         PythonModuleExecutor().run(
                             ModuleDefinition(
@@ -298,13 +295,16 @@ fun ModuleEditorScreen(
                         "ERROR: ${t.message ?: t::class.simpleName}"
                     }
                 }) {
-                    Icon(Icons.Default.PlayArrow, "run", tint = AccentOrange)
+                    Text("run", color = AccentOrange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
-                IconButton(onClick = { if (canSave) save() }) {
-                    Icon(
-                        Icons.Default.Save,
-                        "save",
-                        tint = if (canSave) AccentOrange else TextMuted
+            },
+            rightButtons = {
+                TextButton(onClick = { if (canSave) save() }, enabled = canSave) {
+                    Text(
+                        text = "save",
+                        color = if (canSave) AccentOrange else TextMuted,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
                     )
                 }
             }
@@ -313,35 +313,58 @@ fun ModuleEditorScreen(
 }
 
 @Composable
-private fun CodeField(
+private fun DividerLine() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(TextMuted.copy(alpha = 0.15f))
+    )
+}
+
+/** One metadata line: a comment-style label above a monospace field. */
+@Composable
+private fun CodeInput(
     label: String,
     value: String,
-    onValueChange: (String) -> Unit,
-    singleLine: Boolean
+    onValueChange: (String) -> Unit
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Column {
         Text(
             text = label,
-            color = TextMuted,
+            color = TextMuted.copy(alpha = 0.8f),
             fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
-            modifier = Modifier.width(150.dp)
+            fontSize = 10.sp
         )
+        Spacer(Modifier.height(3.dp))
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            singleLine = singleLine,
+            singleLine = true,
             modifier = Modifier
-                .weight(1f)
+                .fillMaxWidth()
                 .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFF1A1A1A))
-                .padding(horizontal = 6.dp, vertical = 4.dp),
+                .background(EDITOR_BG)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             textStyle = TextStyle(
                 color = TextPrimary,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 12.sp
             ),
-            cursorBrush = SolidColor(AccentOrange)
+            cursorBrush = SolidColor(AccentOrange),
+            decorationBox = { inner ->
+                Box {
+                    if (value.isEmpty()) {
+                        Text(
+                            text = "…",
+                            color = TextMuted.copy(alpha = 0.5f),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp
+                        )
+                    }
+                    inner()
+                }
+            }
         )
     }
 }
