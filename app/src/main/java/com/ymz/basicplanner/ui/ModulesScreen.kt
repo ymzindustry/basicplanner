@@ -76,8 +76,18 @@ fun ModulesScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var editingModule by remember { mutableStateOf<ModuleDefinition?>(null) }
-    var creating by remember { mutableStateOf(false) }
+
+    var editingModuleId by remember { mutableStateOf<Long?>(null) }
+
+    // The editor is a full page, like opening a .py file — not a dialog.
+    if (editingModuleId != null) {
+        ModuleEditorScreen(
+            creationState = creationState,
+            moduleId = editingModuleId!!,
+            onBack = { editingModuleId = null }
+        )
+        return
+    }
     var attachingTo by remember { mutableStateOf<ModuleDefinition?>(null) }
     var deleting by remember { mutableStateOf<ModuleDefinition?>(null) }
 
@@ -96,7 +106,16 @@ fun ModulesScreen(
                     }
                 },
                 rightButtons = {
-                    IconButton(onClick = { creating = true }) {
+                    IconButton(onClick = {
+                        val newModule = ModuleDefinition(
+                            id = creationState.newId(),
+                            name = "new module",
+                            code = ModuleDefinition.DEFAULT_CODE
+                        )
+                        creationState.modules.add(newModule)
+                        scope.launch { AppStateStore.save(context, creationState.toAppState()) }
+                        editingModuleId = newModule.id
+                    }) {
                         Icon(Icons.Default.Add, "new module", tint = AccentOrange)
                     }
                 }
@@ -134,7 +153,7 @@ fun ModulesScreen(
                                 val program = creationState.programs.find { it.id == attachment.programId }?.name ?: ""
                                 "$program · $target"
                             },
-                            onEdit = { editingModule = module },
+                            onEdit = { editingModuleId = module.id },
                             onAttach = { attachingTo = module },
                             onDetach = { attachment ->
                                 creationState.moduleAttachments.remove(attachment)
@@ -147,46 +166,6 @@ fun ModulesScreen(
                 }
             }
         }
-    }
-
-    if (creating) {
-        ModuleEditorDialog(
-            initial = null,
-            onDismiss = { creating = false },
-            onSave = { name, description, code, specs ->
-                creationState.modules.add(
-                    ModuleDefinition(
-                        id = creationState.newId(),
-                        name = name,
-                        description = description,
-                        code = code,
-                        inputs = specs
-                    )
-                )
-                creating = false
-                save()
-            }
-        )
-    }
-
-    editingModule?.let { module ->
-        ModuleEditorDialog(
-            initial = module,
-            onDismiss = { editingModule = null },
-            onSave = { name, description, code, specs ->
-                val index = creationState.modules.indexOfFirst { it.id == module.id }
-                if (index >= 0) {
-                    creationState.modules[index] = module.copy(
-                        name = name,
-                        description = description,
-                        code = code,
-                        inputs = specs
-                    )
-                }
-                editingModule = null
-                save()
-            }
-        )
     }
 
     attachingTo?.let { module ->
@@ -311,126 +290,6 @@ private fun ModuleCard(
         }
     }
 }
-
-@Composable
-private fun ModuleEditorDialog(
-    initial: ModuleDefinition?,
-    onDismiss: () -> Unit,
-    onSave: (String, String, String, List<ModuleInputSpec>) -> Unit
-) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var description by remember { mutableStateOf(initial?.description ?: "") }
-    var inputsText by remember {
-        mutableStateOf(initial?.inputs?.joinToString(", ") { "${it.name}:${it.type}" } ?: "")
-    }
-    var code by remember { mutableStateOf(initial?.code ?: ModuleDefinition.DEFAULT_CODE) }
-    var testOutput by remember { mutableStateOf<String?>(null) }
-
-    val context = LocalContext.current
-
-    fun parseSpecs(): List<ModuleInputSpec> =
-        inputsText.split(',', '\n')
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .map { chunk ->
-                val parts = chunk.split(':', limit = 2)
-                ModuleInputSpec(
-                    name = parts[0].trim(),
-                    type = parts.getOrNull(1)?.trim()?.ifBlank { "int" } ?: "int"
-                )
-            }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = DarkSurfaceAlt,
-        title = { Text(if (initial == null) "New module" else "Edit module", color = TextPrimary, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors()
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Description") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors()
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = inputsText,
-                    onValueChange = { inputsText = it },
-                    label = { Text("Inputs, e.g. form:int, sleep:float") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = fieldColors()
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = { code = it },
-                    label = { Text("Python") },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp),
-                    textStyle = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp
-                    ),
-                    colors = fieldColors()
-                )
-                Spacer(Modifier.height(8.dp))
-                TextButton(onClick = {
-                    testOutput = try {
-                        val preview = ModuleDefinition(
-                            id = initial?.id ?: 0L,
-                            name = name,
-                            description = description,
-                            code = code,
-                            inputs = parseSpecs()
-                        )
-                        // Test bench runs the module on an empty context so syntax/exec errors surface.
-                        val ctx = """{"date":"","program_id":0,"target":{"kind":"test","id":0,"name":"test"},"items":{},"sets":[]}"""
-                        PythonModuleExecutor().run(preview, ctx)
-                    } catch (t: Throwable) {
-                        "ERROR: ${t.message ?: t::class.simpleName}"
-                    }
-                }) {
-                    Icon(Icons.Default.PlayArrow, null, tint = AccentOrange, modifier = Modifier.width(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Test run", color = AccentOrange, fontSize = 12.sp)
-                }
-                testOutput?.let {
-                    Text(it, color = if (it.startsWith("ERROR")) AccentRed else AccentGreen, fontSize = 10.sp)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onSave(name.trim(), description.trim(), code, parseSpecs()) },
-                enabled = name.isNotBlank()
-            ) {
-                Text("Save", color = if (name.isNotBlank()) AccentOrange else TextMuted, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } }
-    )
-}
-
-@Composable
-private fun fieldColors() = OutlinedTextFieldDefaults.colors(
-    unfocusedBorderColor = TextMuted,
-    focusedBorderColor = AccentOrange,
-    unfocusedLabelColor = TextMuted,
-    focusedLabelColor = AccentOrange,
-    cursorColor = AccentOrange,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary
-)
 
 /**
  * Attach a module to one target of one program: choose the program, the kind of target, the target
