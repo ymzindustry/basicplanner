@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Add
@@ -92,6 +93,7 @@ fun ProgramAgendaScreen(
     onOpenDashboard: () -> Unit,
     onStartSession: (Long) -> Unit,
     onOpenTutorial: () -> Unit = {},
+    onOpenModules: () -> Unit = {},
     /** True when the tutorial is in guidance mode — non-target buttons are disabled. */
     tutorialActive: Boolean = false
 ) {
@@ -268,6 +270,16 @@ fun ProgramAgendaScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.TrendingUp,
                             contentDescription = stringResource(R.string.dashboard_open),
+                            tint = if (!isEditMode) AccentOrange else TextMuted
+                        )
+                    }
+                    IconButton(
+                        onClick = onOpenModules,
+                        enabled = !isEditMode && !tutorialActive
+                    ) {
+                        Icon(
+                            Icons.Default.Extension,
+                            contentDescription = "modules",
                             tint = if (!isEditMode) AccentOrange else TextMuted
                         )
                     }

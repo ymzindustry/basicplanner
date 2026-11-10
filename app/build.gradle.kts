@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
+    id("com.chaquo.python")
 }
 
 android {
@@ -16,8 +17,8 @@ android {
         applicationId = "com.ymz.basicplanner.v10"
         minSdk = 26
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.0.20"
+        versionCode = 24
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,6 +41,17 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    // Python runtime for user modules. Only the ABIs the app actually ships.
+    defaultConfig {
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
+    chaquopy {
+        defaultConfig {
+            version = "3.11"
+        }
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true

@@ -8,6 +8,8 @@ import kotlinx.serialization.Contextual
 import java.time.LocalDate
 import java.time.LocalDateTime
 import androidx.compose.ui.res.stringResource
+import com.ymz.basicplanner.model.module.ModuleAttachment
+import com.ymz.basicplanner.model.module.ModuleDefinition
 import com.ymz.basicplanner.R
 
 private val idGenerator = AtomicLong(1L)
@@ -289,5 +291,8 @@ data class AppState(
     val itemFamilies: List<ItemFamily> = emptyList(),
     val items: List<Item> = emptyList(),
     val performanceEntries: List<PerformanceEntry> = emptyList(),
-    val hasSeededGeneratedData: Boolean = false
+    val hasSeededGeneratedData: Boolean = false,
+    /** Python modules and where they are plugged in (per program). */
+    val modules: List<ModuleDefinition> = emptyList(),
+    val moduleAttachments: List<ModuleAttachment> = emptyList()
 )

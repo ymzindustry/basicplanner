@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
                 var loaded by remember { mutableStateOf(false) }
                 var showCreationScreen by remember { mutableStateOf(false) }
                 var showDashboard by remember { mutableStateOf(false) }
+                var showModules by remember { mutableStateOf(false) }
                 var activeSessionId by remember { mutableStateOf<Long?>(null) }
                 var showTutorial by remember { mutableStateOf(false) }
                 var tutorialStep by remember { mutableIntStateOf(0) }
@@ -94,6 +95,8 @@ class MainActivity : ComponentActivity() {
                         BackHandler { activeSessionId = null }
                     } else if (showDashboard) {
                         BackHandler { showDashboard = false }
+                    } else if (showModules) {
+                        BackHandler { showModules = false }
                     } else if (showCreationScreen) {
                         // While the tutorial drives the create dialog, leaving the screen is blocked.
                         val tutorialDialogLocked = showTutorial && tutorialStep == 4
@@ -114,6 +117,12 @@ class MainActivity : ComponentActivity() {
                             DashboardScreen(
                                 creationState = creationState,
                                 onBack = { showDashboard = false }
+                            )
+                        }
+                        showModules -> {
+                            ModulesScreen(
+                                creationState = creationState,
+                                onBack = { showModules = false }
                             )
                         }
                         showCreationScreen -> {
@@ -159,6 +168,7 @@ class MainActivity : ComponentActivity() {
                                         activeSessionId = newSessionId
                                     }
                                 },
+                                onOpenModules = { showModules = true },
                                 onOpenTutorial = {
                                     tutorialStep = 0
                                     tutorialGuiding = false

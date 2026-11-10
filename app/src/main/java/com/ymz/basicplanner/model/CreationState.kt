@@ -29,6 +29,8 @@ class CreationState {
     val items: SnapshotStateList<Item> = mutableStateListOf()
     val itemFamilies: SnapshotStateList<ItemFamily> = mutableStateListOf()
     val performanceEntries: SnapshotStateList<PerformanceEntry> = mutableStateListOf()
+    val modules: SnapshotStateList<com.ymz.basicplanner.model.module.ModuleDefinition> = mutableStateListOf()
+    val moduleAttachments: SnapshotStateList<com.ymz.basicplanner.model.module.ModuleAttachment> = mutableStateListOf()
     var selectedActiveProgramId: Long? = null
     var hasSeededGeneratedData by mutableStateOf(false)
     val dataVersion = mutableStateOf(0)
@@ -1168,7 +1170,9 @@ class CreationState {
             nextId = nextId,
             currentUserName = currentUserName,
             performanceEntries = performanceEntries.toList(),
-            hasSeededGeneratedData = hasSeededGeneratedData
+            hasSeededGeneratedData = hasSeededGeneratedData,
+            modules = modules.toList(),
+            moduleAttachments = moduleAttachments.toList()
         )
     }
 
@@ -1185,6 +1189,8 @@ class CreationState {
         activePrograms.clear(); activePrograms.addAll(app.activePrograms)
         items.clear(); items.addAll(app.items)
         performanceEntries.clear(); performanceEntries.addAll(app.performanceEntries)
+        modules.clear(); modules.addAll(app.modules)
+        moduleAttachments.clear(); moduleAttachments.addAll(app.moduleAttachments)
         if (app.hasSeededGeneratedData) {
             performanceEntries.removeAll { it.note == "Generated demo" }
         }

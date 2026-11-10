@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -55,6 +56,8 @@ import androidx.compose.ui.unit.sp
 import com.ymz.basicplanner.R
 import com.ymz.basicplanner.data.*
 import com.ymz.basicplanner.model.*
+import com.ymz.basicplanner.model.module.ModuleEngine
+import com.ymz.basicplanner.model.module.ModuleOutcome
 import com.ymz.basicplanner.compose.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -208,6 +211,18 @@ fun SessionScreen(
         session.adjustmentPercent + dayPct
     }
 
+    // Modules plugged into this program, evaluated once per data change. They only produce
+    // runtime deltas: the plan entities and the dashboard targets stay untouched.
+    val moduleOutcome: ModuleOutcome = remember(sessionId, creationState.dataVersion.value) {
+        val activeProgId = creationState.getActiveProgramForSession(sessionId)?.id
+        if (activeProgId == null) {
+            ModuleOutcome()
+        } else {
+            ModuleEngine(PythonModuleExecutor())
+                .evaluate(creationState.toAppState(), activeProgId, sessionId)
+        }
+    }
+
     fun calculateProgress(currentSession: SessionEntity) {
 
         val sessionExercises = currentSession.exerciseIds.mapNotNull { id ->
@@ -331,6 +346,33 @@ fun SessionScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            if (!moduleOutcome.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(DarkSurfaceAlt)
+                        .padding(8.dp)
+                ) {
+                    if (moduleOutcome.adjustments.isNotEmpty()) {
+                        Text(
+                            "⚙ ${moduleOutcome.applied.size} module(s) adjusted ${moduleOutcome.adjustments.size} set(s)",
+                            color = AccentOrange,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    moduleOutcome.issues.forEach { issue ->
+                        Text(
+                            "${issue.moduleName}: ${issue.message}",
+                            color = AccentRed,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+
             HarmonizedLazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -394,6 +436,7 @@ fun SessionScreen(
                                 selectedHangEntityName = displayName.toString()
                                 showHangItemDialog = true
                             },
+                            moduleAdjustments = moduleOutcome.adjustments,
                             onHangOnSetEntryClick = { setEntry, index ->
                                 selectedHangEntityId = setEntry.id
                                 selectedHangEntityName = "$strSet ${index + 1}"

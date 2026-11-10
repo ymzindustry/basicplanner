@@ -9,6 +9,8 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+        // Chaquopy (Python runtime for the module system)
+        maven("https://chaquo.com/maven")
     }
 }
 dependencyResolutionManagement {

@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ymz.basicplanner.R
 import com.ymz.basicplanner.model.*
+import com.ymz.basicplanner.model.module.SetAdjustment
 import com.ymz.basicplanner.ui.*
 import kotlin.math.ceil
 
@@ -590,7 +591,9 @@ fun ExerciseExecutionItem(
     onAddSet: () -> Unit,
     onDeleteSet: (Int) -> Unit,
     onHangOnExerciseClick: () -> Unit,
-    onHangOnSetEntryClick: (SetEntry, Int) -> Unit
+    onHangOnSetEntryClick: (SetEntry, Int) -> Unit,
+    /** Runtime deltas from the modules plugged into this program, keyed by set entry id. */
+    moduleAdjustments: Map<Long, SetAdjustment> = emptyMap()
 ) {
 
     var expanded by remember { mutableStateOf(true) }
@@ -692,10 +695,11 @@ fun ExerciseExecutionItem(
                         adjustmentPct = adjustmentPct,
                         isTicking = activeTimerKey == rowKey,
                         currentTimerValue = if (activeTimerKey == rowKey) activeTimerValue else null,
-                        onRestClick = { onStartTimer(entry.rest, rowKey) },
+                        onRestClick = { onStartTimer(entry.rest + (moduleAdjustments[entry.id]?.restDelta ?: 0), rowKey) },
                         onCheckedChange = { isChecked -> onSetToggle(index, isChecked) },
                         onDelete = null,
-                        onHangItemClick = { onHangOnSetEntryClick(entry, index) }
+                        onHangItemClick = { onHangOnSetEntryClick(entry, index) },
+                        moduleAdjustment = moduleAdjustments[entry.id]
                     )
                 }
 
@@ -719,10 +723,11 @@ fun ExerciseExecutionItem(
                         adjustmentPct = adjustmentPct,
                         isTicking = activeTimerKey == rowKey,
                         currentTimerValue = if (activeTimerKey == rowKey) activeTimerValue else null,
-                        onRestClick = { onStartTimer(entry.rest, rowKey) },
+                        onRestClick = { onStartTimer(entry.rest + (moduleAdjustments[entry.id]?.restDelta ?: 0), rowKey) },
                         onCheckedChange = { isChecked -> onSetToggle(index, isChecked) },
                         onDelete = { onDeleteSet(index) },
-                        onHangItemClick = null
+                        onHangItemClick = null,
+                        moduleAdjustment = moduleAdjustments[entry.id]
                     )
                 }
 
@@ -752,18 +757,25 @@ fun SetRow(
     onRestClick: () -> Unit,
     onCheckedChange: (Boolean) -> Unit,
     onDelete: (() -> Unit)? = null,
-    onHangItemClick: (() -> Unit)? = null
+    onHangItemClick: (() -> Unit)? = null,
+    /** Deltas requested by the modules attached to this program; plan values are never rewritten. */
+    moduleAdjustment: SetAdjustment? = null
 ) {
     val isFinished = entry.finished == true
+    val adjusted = moduleAdjustment != null && !moduleAdjustment.isIdentity()
+    val effectiveReps = (entry.reps + (moduleAdjustment?.repsDelta ?: 0)).coerceAtLeast(1)
+    val effectiveIntensity = (entry.intensity + (moduleAdjustment?.percentDelta ?: 0.0)).coerceIn(1.0, 100.0)
+    val effectiveRest = (entry.rest + (moduleAdjustment?.restDelta ?: 0)).coerceAtLeast(0)
+    val kgDelta = moduleAdjustment?.kgDelta ?: 0.0
 
     val weightText = if (entry.weightKg != null) {
-        "${entry.weightKg}"
+        "${entry.weightKg + kgDelta.toInt()}"
     } else if (baseRm != null) {
         val adjustedBase = scaledBaseRm(baseRm, adjustmentPct)
-        val load = ceil(adjustedBase * (entry.intensity / 100.0)).toInt()
-        "$load"
+        val load = ceil(adjustedBase * (effectiveIntensity / 100.0)) + kgDelta
+        "${load.toInt()}"
     } else {
-        stringResource(R.string.intensity_percent_format, entry.intensity)
+        stringResource(R.string.intensity_percent_format, effectiveIntensity.toInt())
     }
 
     Row(
@@ -773,15 +785,25 @@ fun SetRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("$index", color = if (isFinished) AccentGreen else TextPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.width(30.dp))
+        Row(modifier = Modifier.width(30.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("$index", color = if (isFinished) AccentGreen else TextPrimary, fontWeight = FontWeight.Bold)
+            if (adjusted) {
+                Text("•", color = AccentOrange, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
         Spacer(modifier = Modifier.weight(1f))
 
-        Text(text = "${entry.reps}", color = TextPrimary, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(50.dp))
+        Text(
+            text = "$effectiveReps",
+            color = if (adjusted) AccentOrange else TextPrimary,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.width(50.dp)
+        )
         Text(text = weightText, color = TextPrimary, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(50.dp))
 
 
         Text(
-            text = if (isTicking && currentTimerValue != null) "${currentTimerValue}s" else "${entry.rest}s",
+            text = if (isTicking && currentTimerValue != null) "${currentTimerValue}s" else "${effectiveRest}s",
             color = if (isTicking) AccentOrange else TextMuted,
             fontSize = 12.sp,
             fontWeight = if (isTicking) FontWeight.Bold else FontWeight.Normal,
