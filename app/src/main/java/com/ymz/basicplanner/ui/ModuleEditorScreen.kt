@@ -89,17 +89,16 @@ fun ModuleEditorScreen(
         return
     }
 
-    var name by remember(moduleId) { mutableStateOf(module.name) }
     var code by remember(moduleId) { mutableStateOf(module.code) }
     var output by remember(moduleId) { mutableStateOf<String?>(null) }
 
-    val hasApply = Regex("""(?m)^\s*def\s+apply\s*\(""").containsMatchIn(code)
+    val hasApply = Regex("""(?m)^\s*def\s+[A-Za-z_]\w*\s*\(""").containsMatchIn(code)
     val param = ModuleDefinition.pythonParameterName(module.itemName)
 
     fun save() {
         val index = creationState.modules.indexOfFirst { it.id == moduleId }
         if (index < 0) return
-        creationState.modules[index] = creationState.modules[index].copy(name = name.trim(), code = code)
+        creationState.modules[index] = creationState.modules[index].copy(code = code)
         scope.launch { AppStateStore.save(context, creationState.toAppState()) }
     }
 
@@ -146,37 +145,13 @@ fun ModuleEditorScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // The module's name, nothing else: no file name, no input line, no chrome.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = name.ifBlank { "module" },
-                    color = TextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Box(
-                    Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(if (hasApply) AccentGreen else AccentRed)
-                )
-            }
-
             // Code directly on the black background, filling everything left.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
+                    .statusBarsPadding()
             ) {
                 BasicTextField(
                     value = code,

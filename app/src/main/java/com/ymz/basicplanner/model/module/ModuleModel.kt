@@ -39,12 +39,13 @@ data class ModuleDefinition(
 ) {
     companion object {
         /**
-         * The prototype the editor starts from: the parameter is named after the chosen item
-         * (`apply(max)`, `apply(note)` …), because that is the value the function receives.
+         * The prototype a new module starts from: the function is named after the module itself
+         * (`def deadlift_form(form):`), and its single parameter after the chosen item.
          */
-        fun defaultCodeFor(itemName: String): String {
+        fun defaultCodeFor(moduleName: String, itemName: String): String {
+            val fn = pythonFunctionName(moduleName)
             val param = pythonParameterName(itemName)
-            return "def apply($param):\n" +
+            return "def $fn($param):\n" +
                 "    # $param is this item's value, typed\n" +
                 "    # return sets, reps, percent, time\n" +
                 "    # deltas: 0 means no change\n" +
@@ -53,6 +54,15 @@ data class ModuleDefinition(
                 "        return -1, -1, -10.0, 60\n" +
                 "\n" +
                 "    return 0, 0, 0.0, 0\n"
+        }
+
+        /** The function takes the module's own name, so `module 1` → `def module_1(item):`. */
+        fun pythonFunctionName(moduleName: String): String {
+            val slug = moduleName.trim().lowercase()
+                .replace(Regex("[^a-z0-9_]+"), "_")
+                .trim('_')
+            if (slug.isEmpty() || slug.first().isDigit() || slug in PYTHON_KEYWORDS) return "apply"
+            return slug
         }
 
         /** `max effort` → `max_effort`; falls back to `item` for keywords and unusable names. */

@@ -188,7 +188,7 @@ fun ModulesScreen(
                 val newModule = ModuleDefinition(
                     id = creationState.newId(),
                     name = name,
-                    code = ModuleDefinition.defaultCodeFor(family.name),
+                    code = ModuleDefinition.defaultCodeFor(name, family.name),
                     itemFamilyId = family.id,
                     itemName = family.name
                 )
@@ -235,7 +235,14 @@ fun ModulesScreen(
             onRename = { newName ->
                 val index = creationState.modules.indexOfFirst { it.id == module.id }
                 if (index >= 0) {
-                    creationState.modules[index] = creationState.modules[index].copy(name = newName)
+                    val previous = ModuleDefinition.pythonFunctionName(module.name)
+                    val next = ModuleDefinition.pythonFunctionName(newName)
+                    val code = if (previous != next) {
+                        Regex("(?m)^(\\s*def\\s+)" + Regex.escape(previous) + "\\b").replace(module.code, "$1" + next)
+                    } else {
+                        module.code
+                    }
+                    creationState.modules[index] = creationState.modules[index].copy(name = newName, code = code)
                     save()
                 }
                 renaming = null
