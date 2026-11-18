@@ -6,8 +6,9 @@ import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
 import com.ymz.basicplanner.model.CreationState
+import com.ymz.basicplanner.model.ItemFamily
+import com.ymz.basicplanner.model.ItemType
 import com.ymz.basicplanner.model.module.ModuleDefinition
-import com.ymz.basicplanner.model.module.ModuleInputSpec
 import com.ymz.basicplanner.ui.ModuleEditorScreen
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,17 +32,31 @@ class EditorScreenshotTest {
     @Test
     fun module_editor_renders() {
         val creationState = CreationState()
+        creationState.itemFamilies.addAll(
+            listOf(
+                ItemFamily(id = 90L, name = "form", description = "", itemType = ItemType.INT, defaultValue = "7"),
+                ItemFamily(id = 92L, name = "sleep", description = "", itemType = ItemType.FLOAT, defaultValue = "7.5"),
+                ItemFamily(id = 93L, name = "pain", description = "", itemType = ItemType.INT, defaultValue = "0")
+            )
+        )
         creationState.modules.add(
             ModuleDefinition(
                 id = 1L,
                 name = "Deadlift form",
                 description = "Lowers reps when form is poor",
-                code = "def apply(ctx):\n" +
-                    "    form = ctx[\"items\"].get(\"form\", 10)\n" +
-                    "    if form >= 8:\n" +
-                    "        return []\n" +
-                    "    return [{\"set_id\": s[\"id\"], \"reps_delta\": -1} for s in ctx[\"sets\"]]\n",
-                inputs = listOf(ModuleInputSpec("form", "int"))
+                code = """
+                    def apply(ctx):
+                        # the one item this module reads
+                        form = int(ctx["item"]["value"])
+
+                        if form >= 8:
+                            # drained: fewer sets, lighter, longer rest
+                            return {"sets": 3, "reps": 4, "percent": 70, "time": 180}
+
+                        return None
+                """.trimIndent(),
+                itemFamilyId = 90L,
+                itemName = "form"
             )
         )
 

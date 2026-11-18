@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ymz.basicplanner.compose.CommonBottomBar
@@ -59,10 +61,7 @@ import com.ymz.basicplanner.data.PythonModuleExecutor
 import com.ymz.basicplanner.model.CreationState
 import com.ymz.basicplanner.model.module.ModuleAttachment
 import com.ymz.basicplanner.model.module.ModuleDefinition
-import com.ymz.basicplanner.model.module.ModuleInputBinding
-import com.ymz.basicplanner.model.module.ModuleInputSpec
 import com.ymz.basicplanner.model.module.ModuleTargetKind
-import com.ymz.basicplanner.model.module.moduleInputCandidates
 import kotlinx.coroutines.launch
 
 /**
@@ -131,7 +130,8 @@ fun ModulesScreen(
                         val newModule = ModuleDefinition(
                             id = creationState.newId(),
                             name = "new module",
-                            code = ModuleDefinition.DEFAULT_CODE
+                            code = ModuleDefinition.DEFAULT_CODE,
+                            itemFamilyId = null
                         )
                         creationState.modules.add(newModule)
                         scope.launch { AppStateStore.save(context, creationState.toAppState()) }
@@ -226,7 +226,12 @@ private fun attachmentLabel(creationState: CreationState, attachment: ModuleAtta
         ModuleTargetKind.SESSION -> creationState.sessions.find { it.id == attachment.targetId }?.name
         ModuleTargetKind.EXERCISE -> creationState.exercises.find { it.id == attachment.targetId }?.name
         ModuleTargetKind.SET -> "set ${attachment.targetId}"
-    } ?: "?"
+    } ?: when (attachment.targetKind) {
+        ModuleTargetKind.DAY -> "Day (missing)"
+        ModuleTargetKind.SESSION -> "Session (missing)"
+        ModuleTargetKind.EXERCISE -> "Exercise (missing)"
+        ModuleTargetKind.SET -> "Set (missing)"
+    }
 
 @Composable
 private fun ModuleCard(
@@ -256,13 +261,14 @@ private fun ModuleCard(
                 if (module.description.isNotBlank()) {
                     Text(module.description, color = TextMuted, fontSize = 11.sp, maxLines = 2)
                 }
-                if (module.inputs.isNotEmpty()) {
-                    Text(
-                        "inputs: " + module.inputs.joinToString { "${it.name}:${it.type}" },
-                        color = AccentOrange,
-                        fontSize = 10.sp
-                    )
-                }
+                Text(
+                    text = "reads " + module.itemName.ifBlank { "— pick an item" },
+                    color = if (module.itemName.isBlank()) AccentRed else AccentOrange,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             IconButton(onClick = onEdit) {
                 Icon(Icons.Default.Edit, "edit", tint = AccentOrange)
@@ -296,10 +302,18 @@ private fun ModuleCard(
             }
         }
 
-        TextButton(onClick = onAttach, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.Add, null, tint = AccentOrange, modifier = Modifier.width(16.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Attach to a target", color = AccentOrange, fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onAttach, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)) {
+                Icon(Icons.Default.Add, null, tint = AccentOrange, modifier = Modifier.width(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("attach", color = AccentOrange, fontSize = 12.sp)
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = if (attachments.isEmpty()) "not attached" else "${attachments.size} target(s)",
+                color = TextMuted,
+                fontSize = 10.sp
+            )
         }
     }
 }
@@ -318,19 +332,12 @@ private fun AttachModuleDialog(
     var programIndex by remember { mutableStateOf(0) }
     var kind by remember { mutableStateOf(ModuleTargetKind.SESSION) }
     var targetId by remember { mutableStateOf<Long?>(null) }
-    var bindings by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
 
     val programs = creationState.programs
     val program = programs.getOrNull(programIndex)
 
-    val app = remember(creationState.dataVersion.value) { creationState.toAppState() }
-
     val targets: List<Pair<Long, String>> = remember(program?.id, kind, creationState.dataVersion.value) {
         if (program == null) emptyList() else programTargets(creationState, program.id, kind)
-    }
-
-    val candidates = remember(kind, targetId, creationState.dataVersion.value) {
-        targetId?.let { moduleInputCandidates(app, kind, it) } ?: emptyList()
     }
 
     AlertDialog(
@@ -345,7 +352,6 @@ private fun AttachModuleDialog(
                         Modifier.fillMaxWidth().clickable {
                             programIndex = index
                             targetId = null
-                            bindings = emptyMap()
                         }.padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -367,7 +373,6 @@ private fun AttachModuleDialog(
                                 .clickable {
                                     kind = option
                                     targetId = null
-                                    bindings = emptyMap()
                                 }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
@@ -389,7 +394,6 @@ private fun AttachModuleDialog(
                         Row(
                             Modifier.fillMaxWidth().clickable {
                                 targetId = id
-                                bindings = emptyMap()
                             }.padding(vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -400,46 +404,22 @@ private fun AttachModuleDialog(
                     }
                 }
 
-                if (targetId != null && module.inputs.isNotEmpty()) {
+                if (targetId != null) {
                     Spacer(Modifier.height(10.dp))
-                    Text("Inputs (target itself or its parents)", color = TextMuted, fontSize = 11.sp)
-                    module.inputs.forEach { spec ->
-                        val boundId = bindings[spec.name]
-                        Text(
-                            "${spec.name} (${spec.type}) → " + (candidates.find { it.entityId == boundId }?.let { "${it.kindLabel}: ${it.name}" } ?: "not bound"),
-                            color = if (boundId == null) AccentRed else AccentGreen,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(top = 6.dp)
-                        )
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            candidates.take(4).forEach { candidate ->
-                                Box(
-                                    Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (candidate.entityId == boundId) AccentOrange else DarkSurface)
-                                        .clickable {
-                                            bindings = bindings + (spec.name to candidate.entityId)
-                                        }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        "${candidate.kindLabel}: ${candidate.name}".take(22),
-                                        color = if (candidate.entityId == boundId) DarkBackground else TextPrimary,
-                                        fontSize = 10.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    Text(
+                        text = if (module.itemName.isBlank()) {
+                            "No item yet — open the module and pick one."
+                        } else {
+                            "reads “${module.itemName}” on the target or its closest parent"
+                        },
+                        color = if (module.itemName.isBlank()) AccentRed else TextMuted,
+                        fontSize = 11.sp
+                    )
                 }
             }
         },
         confirmButton = {
-            val ready = targetId != null && program != null &&
-                module.inputs.all { bindings.containsKey(it.name) }
+            val ready = targetId != null && program != null && module.itemName.isNotBlank()
             TextButton(
                 onClick = {
                     val id = targetId ?: return@TextButton
@@ -449,16 +429,7 @@ private fun AttachModuleDialog(
                             moduleId = module.id,
                             programId = program!!.id,
                             targetKind = kind,
-                            targetId = id,
-                            bindings = module.inputs.mapNotNull { spec ->
-                                bindings[spec.name]?.let { entityId ->
-                                    ModuleInputBinding(
-                                        specName = spec.name,
-                                        entityId = entityId,
-                                        entityLabel = candidates.find { it.entityId == entityId }?.name ?: ""
-                                    )
-                                }
-                            }
+                            targetId = id
                         )
                     )
                 },

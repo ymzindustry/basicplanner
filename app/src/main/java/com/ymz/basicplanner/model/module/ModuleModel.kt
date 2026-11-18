@@ -22,8 +22,11 @@ data class ModuleInputBinding(
 )
 
 /**
- * A Python function `apply(ctx)` plus the inputs it declares. Stored as source text so modules can
- * be written inside the app; [code] is executed by the platform executor (Chaquopy).
+ * A Python function `apply(ctx)` that reads exactly one item and returns the prescription to apply
+ * to every set it covers: `{"sets": n, "reps": n, "percent": n, "time": n}`.
+ *
+ * [itemFamilyId] is the single item the function may read, picked when the module is created; the
+ * engine resolves its value on the target (or the closest ancestor that carries it).
  */
 @Serializable
 data class ModuleDefinition(
@@ -31,15 +34,39 @@ data class ModuleDefinition(
     val name: String,
     val description: String = "",
     val code: String = DEFAULT_CODE,
-    val inputs: List<ModuleInputSpec> = emptyList()
+    val itemFamilyId: Long? = null,
+    val itemName: String = ""
 ) {
     companion object {
         const val DEFAULT_CODE: String =
             "def apply(ctx):\n" +
-                "    # ctx: date, program_id, target{kind,id,name}, items{name: value}, sets[]\n" +
-                "    # return a list like [{\"set_id\": 12, \"reps_delta\": -1}]\n" +
-                "    return []\n"
+                "    # ctx[\"item\"] is the one item this module reads: {\"name\", \"value\"}\n" +
+                "    form = int(ctx[\"item\"][\"value\"])\n" +
+                "\n" +
+                "    if form >= 8:\n" +
+                "        # drained: fewer sets, one rep less, lighter, longer rest\n" +
+                "        return {\"sets\": 3, \"reps\": 4, \"percent\": 70, \"time\": 180}\n" +
+                "\n" +
+                "    # fresh: run the plan as written\n" +
+                "    return None\n"
+
+        /** The four keys a module may return; anything else is ignored. */
+        const val RETURN_KEYS = "sets, reps, percent, time"
     }
+}
+
+/**
+ * What `apply(ctx)` returns: the prescription for the sets it covers. Every field is optional; a
+ * missing field means "leave the plan value alone".
+ */
+@Serializable
+data class ModulePrescription(
+    val sets: Int? = null,
+    val reps: Int? = null,
+    val percent: Double? = null,
+    val time: Int? = null
+) {
+    fun isIdentity(): Boolean = sets == null && reps == null && percent == null && time == null
 }
 
 /**
@@ -76,15 +103,24 @@ data class ModuleTargetInfo(
     val name: String
 )
 
+/** The one item a module reads: its family name and the value found on the target or an ancestor. */
+@Serializable
+data class ModuleItemInfo(
+    val name: String,
+    val value: String
+)
+
 /** The JSON payload handed to `apply(ctx)`. */
 @Serializable
 data class ModuleContext(
     val date: String,
     val program_id: Long,
     val target: ModuleTargetInfo,
-    /** Item family name → value, for every entity bound to an input. */
-    val items: Map<String, String>,
-    val sets: List<ModuleSetSnapshot>
+    /** The module's single item — what `apply` is allowed to read. */
+    val item: ModuleItemInfo? = null,
+    /** Item family name → value (kept for modules that still read the whole map). */
+    val items: Map<String, String> = emptyMap(),
+    val sets: List<ModuleSetSnapshot> = emptyList()
 )
 
 /** Adjustments a module asks for on one set; deltas so several modules can stack. */
@@ -102,6 +138,8 @@ data class ModuleRunIssue(val moduleId: Long, val moduleName: String, val messag
 
 data class ModuleOutcome(
     val adjustments: Map<Long, SetAdjustment> = emptyMap(),
+    /** Prescription per exercise, so a module asking for 3 sets can be shown as such. */
+    val prescriptions: Map<Long, ModulePrescription> = emptyMap(),
     val applied: List<Long> = emptyList(),
     val issues: List<ModuleRunIssue> = emptyList()
 ) {

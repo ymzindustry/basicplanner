@@ -6,9 +6,10 @@ import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
 import com.ymz.basicplanner.model.CreationState
+import com.ymz.basicplanner.model.ItemFamily
+import com.ymz.basicplanner.model.ItemType
 import com.ymz.basicplanner.model.module.ModuleAttachment
 import com.ymz.basicplanner.model.module.ModuleDefinition
-import com.ymz.basicplanner.model.module.ModuleInputSpec
 import com.ymz.basicplanner.model.module.ModuleTargetKind
 import com.ymz.basicplanner.ui.ModulesScreen
 import org.junit.Test
@@ -29,12 +30,19 @@ class ModulesScreenshotTest {
     @Test
     fun modules_list_renders() {
         val cs = CreationState()
+        cs.itemFamilies.addAll(
+            listOf(
+                ItemFamily(id = 90L, name = "form", description = "", itemType = ItemType.INT),
+                ItemFamily(id = 92L, name = "sleep", description = "", itemType = ItemType.FLOAT)
+            )
+        )
         cs.modules.add(
             ModuleDefinition(
                 id = 1L,
                 name = "Deadlift form",
                 description = "Lowers reps when form is poor",
-                inputs = listOf(ModuleInputSpec("form", "int"))
+                itemFamilyId = 90L,
+                itemName = "form"
             )
         )
         cs.modules.add(
@@ -42,7 +50,8 @@ class ModulesScreenshotTest {
                 id = 2L,
                 name = "Deload week",
                 description = "Drops intensity on the last week",
-                inputs = listOf(ModuleInputSpec("week", "int"))
+                itemFamilyId = 90L,
+                itemName = "week"
             )
         )
         cs.moduleAttachments.add(

@@ -95,21 +95,11 @@ private fun programBlockIds(app: AppState, program: com.ymz.basicplanner.model.P
     return ids
 }
 
-@Serializable
-private data class ModuleOutputItem(
-    val set_id: Long? = null,
-    val reps_delta: Int? = null,
-    val percent_delta: Double? = null,
-    val kg_delta: Double? = null,
-    val rest_delta: Int? = null
-)
-
-@Serializable
-private data class ModuleOutputWrapper(val sets: List<ModuleOutputItem> = emptyList())
-
 /**
  * Runs the modules attached to one program for one session and returns, per set entry, the summed
- * deltas. Modules never mutate the plan: the caller applies the deltas to a display/runtime copy.
+ * deltas. A module returns a prescription (`sets, reps, percent, time`); the engine turns it into a
+ * delta against each set's plan values. Modules never mutate the plan: the caller applies the deltas
+ * to a display/runtime copy.
  *
  * Order is broadest first (day → session → exercise → set) then by attachment id, and every module
  * sees the *plan* values, so the result does not depend on execution order — deltas simply add up.
@@ -133,6 +123,7 @@ class ModuleEngine(private val executor: ModuleExecutor) {
         if (attachments.isEmpty()) return ModuleOutcome()
 
         val deltaBySet = mutableMapOf<Long, SetAdjustment>()
+        val byExercise = mutableMapOf<Long, MutableList<ModulePrescription>>()
         val applied = mutableListOf<Long>()
         val issues = mutableListOf<ModuleRunIssue>()
 
@@ -141,7 +132,7 @@ class ModuleEngine(private val executor: ModuleExecutor) {
             val affected = affectedSets(app, attachment, session.id)
             if (affected.isEmpty()) return@forEach
 
-            val context = buildContext(app, ap, session, attachment, affected)
+            val context = buildContext(app, ap, session, attachment, affected, module)
             val output = try {
                 executor.run(module, json.encodeToString(ModuleContext.serializer(), context))
             } catch (t: Throwable) {
@@ -149,27 +140,29 @@ class ModuleEngine(private val executor: ModuleExecutor) {
                 return@forEach
             }
 
-            val items = try {
+            val prescription = try {
                 parseOutput(output)
             } catch (t: Throwable) {
                 issues += ModuleRunIssue(module.id, module.name, "invalid output: ${t.message ?: ""}")
                 return@forEach
-            }
+            } ?: return@forEach
 
-            val affectedIds = affected.map { it.second.id }.toSet()
             var changed = false
-            items.forEach { item ->
-                val setId = item.set_id ?: return@forEach
-                if (setId !in affectedIds) return@forEach
-                val current = deltaBySet[setId] ?: SetAdjustment()
+            affected.forEach { (exercise, entry) ->
+                val current = deltaBySet[entry.id] ?: SetAdjustment()
                 val updated = SetAdjustment(
-                    repsDelta = current.repsDelta + (item.reps_delta ?: 0),
-                    percentDelta = current.percentDelta + (item.percent_delta ?: 0.0),
-                    kgDelta = current.kgDelta + (item.kg_delta ?: 0.0),
-                    restDelta = current.restDelta + (item.rest_delta ?: 0)
+                    repsDelta = current.repsDelta + (prescription.reps?.minus(entry.reps) ?: 0),
+                    percentDelta = current.percentDelta +
+                        (prescription.percent?.minus(entry.intensity.toDouble()) ?: 0.0),
+                    kgDelta = current.kgDelta,
+                    restDelta = current.restDelta + (prescription.time?.minus(entry.rest) ?: 0)
                 )
                 if (updated != current) {
-                    deltaBySet[setId] = updated
+                    deltaBySet[entry.id] = updated
+                    changed = true
+                }
+                if (prescription.sets != null) {
+                    byExercise.getOrPut(exercise.id) { mutableListOf() }.add(prescription)
                     changed = true
                 }
             }
@@ -178,6 +171,7 @@ class ModuleEngine(private val executor: ModuleExecutor) {
 
         return ModuleOutcome(
             adjustments = deltaBySet.filterValues { !it.isIdentity() },
+            prescriptions = byExercise.mapValues { (_, list) -> mergePrescriptions(list) },
             applied = applied.distinct(),
             issues = issues
         )
@@ -197,15 +191,29 @@ class ModuleEngine(private val executor: ModuleExecutor) {
         return buildContext(app, ap, session, attachment, affectedSets(app, attachment, session.id))
     }
 
-    private fun parseOutput(output: String): List<ModuleOutputItem> {
+    /**
+     * `apply` returns the prescription for the sets it covers, or None to leave the plan alone.
+     * Unknown keys are ignored, and a missing key means "keep the plan value".
+     */
+    private fun parseOutput(output: String): ModulePrescription? {
         val trimmed = output.trim()
-        if (trimmed.isEmpty() || trimmed == "[]" || trimmed == "None" || trimmed == "null") return emptyList()
-        return if (trimmed.startsWith("{")) {
-            json.decodeFromString(ModuleOutputWrapper.serializer(), trimmed).sets
-        } else {
-            json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(ModuleOutputItem.serializer()), trimmed)
+        if (trimmed.isEmpty() || trimmed == "[]" || trimmed == "{}" ||
+            trimmed == "None" || trimmed == "null"
+        ) {
+            return null
         }
+        val prescription = json.decodeFromString(ModulePrescription.serializer(), trimmed)
+        return if (prescription.isIdentity()) null else prescription
     }
+
+    /** Several modules on the same exercise: the last one to ask for a set count wins, the rest merge. */
+    private fun mergePrescriptions(list: List<ModulePrescription>): ModulePrescription =
+        ModulePrescription(
+            sets = list.lastOrNull { it.sets != null }?.sets,
+            reps = list.lastOrNull { it.reps != null }?.reps,
+            percent = list.lastOrNull { it.percent != null }?.percent,
+            time = list.lastOrNull { it.time != null }?.time
+        )
 
     private fun breadth(kind: ModuleTargetKind): Int = when (kind) {
         ModuleTargetKind.DAY -> 0
@@ -240,18 +248,29 @@ class ModuleEngine(private val executor: ModuleExecutor) {
         ap: ActiveProgram,
         session: com.ymz.basicplanner.model.SessionEntity,
         attachment: ModuleAttachment,
-        affected: List<Pair<ExerciseEntity, SetEntry>>
+        affected: List<Pair<ExerciseEntity, SetEntry>>,
+        module: ModuleDefinition? = null
     ): ModuleContext {
         val families = app.itemFamilies.associateBy { it.id }
         val items = mutableMapOf<String, String>()
-        attachment.bindings.forEach { binding ->
-            app.items
-                .filter { it.entityId == binding.entityId }
+
+        // A module reads exactly one item, picked at creation. Its value is taken from the target
+        // itself when it carries the item, otherwise from the closest ancestor that does.
+        var itemInfo: ModuleItemInfo? = null
+        val familyId = module?.itemFamilyId
+        if (familyId != null) {
+            val familyName = families[familyId]?.name ?: module.itemName
+            val chain = moduleInputCandidates(app, attachment.targetKind, attachment.targetId)
+                .mapIndexed { index, candidate -> candidate.entityId to index }
+                .toMap()
+            val match = app.items
+                .filter { it.itemFamilyId == familyId }
                 .filter { it.activeProgramId == null || it.activeProgramId == ap.id }
-                .forEach { item ->
-                    val name = families[item.itemFamilyId]?.name ?: binding.specName
-                    items[name] = item.value
-                }
+                .filter { it.entityId in chain }
+                .minByOrNull { chain[it.entityId] ?: Int.MAX_VALUE }
+            val value = match?.value ?: ""
+            if (familyName.isNotBlank()) items[familyName] = value
+            itemInfo = ModuleItemInfo(name = familyName, value = value)
         }
 
         val date = session.date?.toLocalDate() ?: LocalDate.now()
@@ -277,6 +296,7 @@ class ModuleEngine(private val executor: ModuleExecutor) {
                 id = attachment.targetId,
                 name = targetName(app, attachment)
             ),
+            item = itemInfo,
             items = items,
             sets = sets
         )

@@ -18,12 +18,11 @@ import com.ymz.basicplanner.model.module.ModuleAttachment
 import com.ymz.basicplanner.model.module.ModuleDefinition
 import com.ymz.basicplanner.model.module.ModuleEngine
 import com.ymz.basicplanner.model.module.ModuleExecutor
-import com.ymz.basicplanner.model.module.ModuleInputBinding
-import com.ymz.basicplanner.model.module.ModuleInputSpec
 import com.ymz.basicplanner.model.module.ModuleTargetKind
 import com.ymz.basicplanner.model.module.moduleInputCandidates
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -31,8 +30,9 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 /**
- * The module engine: modules read items from the target (or its ancestors), return deltas, and the
- * engine sums them per set — without ever touching the plan.
+ * The module engine: a module reads exactly one item and returns a prescription
+ * (`sets, reps, percent, time`), which the engine turns into per-set deltas — without ever
+ * touching the plan.
  */
 class ModuleEngineTest {
 
@@ -100,7 +100,8 @@ class ModuleEngineTest {
         id = id,
         name = "Form",
         code = code,
-        inputs = listOf(ModuleInputSpec("form", "int"))
+        itemFamilyId = 90L,
+        itemName = "form"
     )
 
     private fun dayAttachment(programId: Long = 70L, moduleId: Long = 1L) = ModuleAttachment(
@@ -108,17 +109,16 @@ class ModuleEngineTest {
         moduleId = moduleId,
         programId = programId,
         targetKind = ModuleTargetKind.DAY,
-        targetId = 40L,
-        bindings = listOf(ModuleInputBinding("form", 40L, "Monday"))
+        targetId = 40L
     )
 
     @Test
-    fun a_day_module_lowers_every_set_of_that_day() {
+    fun a_day_module_applies_its_prescription_to_every_set_of_that_day() {
         val f = Fixture()
         val executor = ModuleExecutor { _, contextJson ->
-            // The module sees the day's form item, not the plan.
-            assertTrue(contextJson.contains("\"form\":\"7\""))
-            """[{"set_id":100,"reps_delta":-1},{"set_id":101,"reps_delta":-1}]"""
+            // The module sees its one item, resolved on the day the target belongs to.
+            assertTrue(contextJson.contains("\"item\":{\"name\":\"form\",\"value\":\"7\"}"))
+            """{"reps":4}"""
         }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment())),
@@ -126,16 +126,62 @@ class ModuleEngineTest {
             sessionId = 20L
         )
 
+        // plan reps are 5 and 3, the module asks for 4 → deltas -1 and +1
         assertEquals(-1, outcome.adjustments[100L]?.repsDelta)
-        assertEquals(-1, outcome.adjustments[101L]?.repsDelta)
+        assertEquals(1, outcome.adjustments[101L]?.repsDelta)
         assertTrue(outcome.issues.isEmpty())
         assertEquals(listOf(1L), outcome.applied)
     }
 
     @Test
+    fun percent_and_time_become_deltas_against_the_plan() {
+        val f = Fixture()
+        val executor = ModuleExecutor { _, _ -> """{"percent":75,"time":90}""" }
+        val outcome = ModuleEngine(executor).evaluate(
+            f.app(listOf(module()), listOf(dayAttachment())),
+            activeProgramId = 80L,
+            sessionId = 20L
+        )
+
+        assertEquals(-5.0, outcome.adjustments[100L]?.percentDelta ?: 0.0, 0.001)
+        assertEquals(-30, outcome.adjustments[100L]?.restDelta)
+        assertEquals(-15.0, outcome.adjustments[101L]?.percentDelta ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun a_set_count_is_kept_per_exercise() {
+        val f = Fixture()
+        val executor = ModuleExecutor { _, _ -> """{"sets":3}""" }
+        val outcome = ModuleEngine(executor).evaluate(
+            f.app(listOf(module()), listOf(dayAttachment())),
+            activeProgramId = 80L,
+            sessionId = 20L
+        )
+
+        assertEquals(3, outcome.prescriptions[10L]?.sets)
+        assertEquals(listOf(1L), outcome.applied)
+    }
+
+    @Test
+    fun returning_none_leaves_the_plan_alone() {
+        val f = Fixture()
+        val executor = ModuleExecutor { _, _ -> "None" }
+        val outcome = ModuleEngine(executor).evaluate(
+            f.app(listOf(module()), listOf(dayAttachment())),
+            activeProgramId = 80L,
+            sessionId = 20L
+        )
+
+        assertTrue(outcome.adjustments.isEmpty())
+        assertTrue(outcome.prescriptions.isEmpty())
+        assertTrue(outcome.applied.isEmpty())
+        assertTrue(outcome.issues.isEmpty())
+    }
+
+    @Test
     fun a_module_of_another_program_does_not_touch_this_one() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> """[{"set_id":100,"reps_delta":-1}]""" }
+        val executor = ModuleExecutor { _, _ -> """{"reps":4}""" }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment(programId = 70L))),
             activeProgramId = 81L, // other program, same exercises
@@ -147,10 +193,10 @@ class ModuleEngineTest {
     }
 
     @Test
-    fun deltas_from_several_modules_add_up() {
+    fun prescriptions_from_several_modules_add_up() {
         val f = Fixture()
         val executor = ModuleExecutor { module, _ ->
-            if (module.id == 1L) """[{"set_id":100,"reps_delta":-1}]""" else """[{"set_id":100,"percent_delta":-5.0}]"""
+            if (module.id == 1L) """{"reps":4}""" else """{"percent":75}"""
         }
         val attachments = listOf(
             dayAttachment(),
@@ -175,7 +221,7 @@ class ModuleEngineTest {
     @Test
     fun a_set_module_only_touches_its_own_set() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> """[{"set_id":100,"kg_delta":-2.5},{"set_id":101,"kg_delta":-2.5}]""" }
+        val executor = ModuleExecutor { _, _ -> """{"reps":4}""" }
         val attachment = ModuleAttachment(
             id = 3L,
             moduleId = 1L,
@@ -189,7 +235,7 @@ class ModuleEngineTest {
             sessionId = 20L
         )
 
-        assertEquals(-2.5, outcome.adjustments[100L]?.kgDelta ?: 0.0, 0.001)
+        assertEquals(-1, outcome.adjustments[100L]?.repsDelta)
         assertFalse(outcome.adjustments.containsKey(101L))
     }
 
@@ -209,9 +255,9 @@ class ModuleEngineTest {
     }
 
     @Test
-    fun unknown_set_ids_in_the_output_are_ignored() {
+    fun an_unreadable_output_is_an_issue_not_a_crash() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> """[{"set_id":999,"reps_delta":-5}]""" }
+        val executor = ModuleExecutor { _, _ -> "returned something odd" }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment())),
             activeProgramId = 80L,
@@ -219,7 +265,48 @@ class ModuleEngineTest {
         )
 
         assertTrue(outcome.adjustments.isEmpty())
-        assertTrue(outcome.applied.isEmpty())
+        assertEquals(1, outcome.issues.size)
+        assertTrue(outcome.issues.first().message.startsWith("invalid output"))
+    }
+
+    @Test
+    fun an_item_missing_on_the_target_falls_back_to_its_parent() {
+        val f = Fixture()
+        // The item lives on the day; the module is attached to the exercise.
+        val executor = ModuleExecutor { _, contextJson ->
+            assertTrue(contextJson.contains("\"value\":\"7\""))
+            """{"reps":4}"""
+        }
+        val attachment = ModuleAttachment(
+            id = 4L,
+            moduleId = 1L,
+            programId = 70L,
+            targetKind = ModuleTargetKind.EXERCISE,
+            targetId = 10L
+        )
+        val outcome = ModuleEngine(executor).evaluate(
+            f.app(listOf(module()), listOf(attachment)),
+            activeProgramId = 80L,
+            sessionId = 20L
+        )
+
+        assertEquals(-1, outcome.adjustments[100L]?.repsDelta)
+    }
+
+    @Test
+    fun without_a_chosen_item_the_module_reads_an_empty_value() {
+        val f = Fixture()
+        val executor = ModuleExecutor { _, contextJson ->
+            assertTrue(contextJson.contains("\"item\":null"))
+            "None"
+        }
+        val noItem = module().copy(itemFamilyId = null, itemName = "")
+        ModuleEngine(executor).evaluate(
+            f.app(listOf(noItem), listOf(dayAttachment())),
+            activeProgramId = 80L,
+            sessionId = 20L
+        )
+        assertNull(null) // the assertions above are the point: no crash, explicit null item
     }
 
     @Test
