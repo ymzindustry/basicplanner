@@ -45,11 +45,11 @@ data class ModuleDefinition(
         fun defaultCodeFor(itemName: String): String {
             val param = pythonParameterName(itemName)
             return "def apply($param):\n" +
-                "    # $param: the value of this item, already typed\n" +
-                "    # return sets, reps, percent, time — deltas added to the plan\n" +
-                "    # everything starts at zero, so 0 means \"no change\"\n" +
+                "    # $param is this item's value, typed\n" +
+                "    # return sets, reps, percent, time\n" +
+                "    # deltas: 0 means no change\n" +
                 "    if $param >= 8:\n" +
-                "        # drained: one set less, one rep less, 10% lighter, +60 s rest\n" +
+                "        # drained: 10% lighter\n" +
                 "        return -1, -1, -10.0, 60\n" +
                 "\n" +
                 "    return 0, 0, 0.0, 0\n"

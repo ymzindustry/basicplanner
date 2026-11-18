@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -95,6 +97,8 @@ fun ModulesScreen(
     }
     var creating by remember { mutableStateOf(false) }
     var attachingTo by remember { mutableStateOf<ModuleDefinition?>(null) }
+    var changingInput by remember { mutableStateOf<ModuleDefinition?>(null) }
+    var renaming by remember { mutableStateOf<ModuleDefinition?>(null) }
     var deleting by remember { mutableStateOf<ModuleDefinition?>(null) }
 
     fun save() {
@@ -117,24 +121,21 @@ fun ModulesScreen(
                     .padding(horizontal = 4.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "back", tint = AccentOrange)
-                    }
+                IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "back", tint = AccentOrange)
                 }
                 Text(
-                    text = "Modules",
-                    color = AccentOrange,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    textAlign = TextAlign.Center,
+                    text = "MODULES",
+                    color = TextPrimary,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 6.dp)
                 )
-                Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
-                    IconButton(onClick = { creating = true }) {
-                        Icon(Icons.Default.Add, "new module", tint = AccentOrange)
-                    }
+                IconButton(onClick = { creating = true }) {
+                    Icon(Icons.Default.Add, "new module", tint = AccentOrange)
                 }
             }
 
@@ -163,6 +164,8 @@ fun ModulesScreen(
                                 listOfNotNull(program, target).joinToString(" · ")
                             },
                             onEdit = { editingModuleId = module.id },
+                            onChangeInput = { changingInput = module },
+                            onRename = { renaming = module },
                             onAttach = { attachingTo = module },
                             onDetach = { attachment ->
                                 creationState.moduleAttachments.remove(attachment)
@@ -193,6 +196,49 @@ fun ModulesScreen(
                 scope.launch { AppStateStore.save(context, creationState.toAppState()) }
                 creating = false
                 editingModuleId = newModule.id
+            }
+        )
+    }
+
+    changingInput?.let { module ->
+        ChangeInputDialog(
+            creationState = creationState,
+            module = module,
+            onDismiss = { changingInput = null },
+            onPick = { family ->
+                val index = creationState.modules.indexOfFirst { it.id == module.id }
+                if (index >= 0) {
+                    val previous = ModuleDefinition.pythonParameterName(module.itemName)
+                    val next = ModuleDefinition.pythonParameterName(family.name)
+                    // Keep the prototype in step with the new input.
+                    val code = if (previous != next) {
+                        Regex("\\b" + Regex.escape(previous) + "\\b").replace(module.code, next)
+                    } else {
+                        module.code
+                    }
+                    creationState.modules[index] = creationState.modules[index].copy(
+                        itemFamilyId = family.id,
+                        itemName = family.name,
+                        code = code
+                    )
+                    save()
+                }
+                changingInput = null
+            }
+        )
+    }
+
+    renaming?.let { module ->
+        RenameModuleDialog(
+            module = module,
+            onDismiss = { renaming = null },
+            onRename = { newName ->
+                val index = creationState.modules.indexOfFirst { it.id == module.id }
+                if (index >= 0) {
+                    creationState.modules[index] = creationState.modules[index].copy(name = newName)
+                    save()
+                }
+                renaming = null
             }
         )
     }
@@ -255,6 +301,8 @@ private fun ModuleCard(
     attachments: List<ModuleAttachment>,
     attachmentLabel: (ModuleAttachment) -> String,
     onEdit: () -> Unit,
+    onChangeInput: () -> Unit,
+    onRename: () -> Unit,
     onAttach: () -> Unit,
     onDetach: (ModuleAttachment) -> Unit,
     onDelete: () -> Unit
@@ -286,11 +334,38 @@ private fun ModuleCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, "edit", tint = AccentOrange)
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, "delete", tint = AccentRed)
+            // ⋯ : open the file, change its input, rename it, delete it.
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Default.MoreVert, "module actions", tint = TextMuted)
+                }
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    modifier = Modifier.background(DarkSurfaceAlt)
+                ) {
+                    listOf(
+                        "Open file" to onEdit,
+                        "Change input" to onChangeInput,
+                        "Rename" to onRename,
+                        "Delete" to onDelete
+                    ).forEach { (label, action) ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = label,
+                                    color = if (label == "Delete") AccentRed else TextPrimary,
+                                    fontSize = 13.sp
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                action()
+                            }
+                        )
+                    }
+                }
             }
         }
 
@@ -452,6 +527,93 @@ private fun AttachModuleDialog(
                 enabled = ready
             ) {
                 Text("Attach", color = if (ready) AccentOrange else TextMuted, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } }
+    )
+}
+
+/** Change the input of an existing module — the only place it is editable after creation. */
+@Composable
+private fun ChangeInputDialog(
+    creationState: CreationState,
+    module: ModuleDefinition,
+    onDismiss: () -> Unit,
+    onPick: (ItemFamily) -> Unit
+) {
+    val selectable = creationState.itemFamilies.filter { it.itemType != ItemType.IMAGE }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DarkSurfaceAlt,
+        title = { Text("Change input", color = TextPrimary, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                Text(
+                    "The file's parameter is renamed to match, e.g. apply(form) → apply(sleep).",
+                    color = TextMuted,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                selectable.forEach { family ->
+                    val selected = family.id == module.itemFamilyId
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPick(family) }
+                            .padding(vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(if (selected) "◉" else "○", color = AccentOrange)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            family.name,
+                            color = if (selected) AccentOrange else TextPrimary,
+                            fontSize = 13.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            family.itemType.name.lowercase(),
+                            color = TextMuted,
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } }
+    )
+}
+
+@Composable
+private fun RenameModuleDialog(
+    module: ModuleDefinition,
+    onDismiss: () -> Unit,
+    onRename: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(module.name) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DarkSurfaceAlt,
+        title = { Text("Rename module", color = TextPrimary, fontWeight = FontWeight.Bold) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccentOrange,
+                    unfocusedBorderColor = TextMuted.copy(alpha = 0.3f),
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    cursorColor = AccentOrange
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { if (text.isNotBlank()) onRename(text.trim()) }) {
+                Text("Rename", color = AccentOrange, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } }
