@@ -8,6 +8,8 @@ import com.ymz.basicplanner.model.effectiveAdjustmentPercent
 import com.ymz.basicplanner.model.scaledBaseRm
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.contentOrNull
 import java.time.LocalDate
 import kotlin.math.ceil
 
@@ -192,8 +194,8 @@ class ModuleEngine(private val executor: ModuleExecutor) {
     }
 
     /**
-     * `apply` returns the prescription for the sets it covers, or None to leave the plan alone.
-     * Unknown keys are ignored, and a missing key means "keep the plan value".
+     * `apply` returns `sets, reps, percent, time` — a Python tuple, so a JSON array here — or None
+     * to leave the plan alone. Missing trailing values mean "keep the plan value".
      */
     private fun parseOutput(output: String): ModulePrescription? {
         val trimmed = output.trim()
@@ -202,7 +204,15 @@ class ModuleEngine(private val executor: ModuleExecutor) {
         ) {
             return null
         }
-        val prescription = json.decodeFromString(ModulePrescription.serializer(), trimmed)
+        val array = json.parseToJsonElement(trimmed).jsonArray
+        fun Int.index(): kotlinx.serialization.json.JsonPrimitive? =
+            array.getOrNull(this) as? kotlinx.serialization.json.JsonPrimitive
+        val prescription = ModulePrescription(
+            sets = 0.index()?.contentOrNull?.toIntOrNull(),
+            reps = 1.index()?.contentOrNull?.toIntOrNull(),
+            percent = 2.index()?.contentOrNull?.toDoubleOrNull(),
+            time = 3.index()?.contentOrNull?.toIntOrNull()
+        )
         return if (prescription.isIdentity()) null else prescription
     }
 
@@ -259,7 +269,9 @@ class ModuleEngine(private val executor: ModuleExecutor) {
         var itemInfo: ModuleItemInfo? = null
         val familyId = module?.itemFamilyId
         if (familyId != null) {
-            val familyName = families[familyId]?.name ?: module.itemName
+            val family = families[familyId]
+            val familyName = family?.name ?: module.itemName
+            val typeLabel = family?.itemType?.name?.lowercase() ?: "string"
             val chain = moduleInputCandidates(app, attachment.targetKind, attachment.targetId)
                 .mapIndexed { index, candidate -> candidate.entityId to index }
                 .toMap()
@@ -270,7 +282,7 @@ class ModuleEngine(private val executor: ModuleExecutor) {
                 .minByOrNull { chain[it.entityId] ?: Int.MAX_VALUE }
             val value = match?.value ?: ""
             if (familyName.isNotBlank()) items[familyName] = value
-            itemInfo = ModuleItemInfo(name = familyName, value = value)
+            itemInfo = ModuleItemInfo(name = familyName, type = typeLabel, value = value)
         }
 
         val date = session.date?.toLocalDate() ?: LocalDate.now()

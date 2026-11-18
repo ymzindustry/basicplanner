@@ -23,6 +23,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -57,9 +60,11 @@ import com.ymz.basicplanner.data.AppStateStore
 import com.ymz.basicplanner.data.PythonModuleExecutor
 import com.ymz.basicplanner.model.CreationState
 import com.ymz.basicplanner.model.module.ModuleDefinition
+import com.ymz.basicplanner.model.ItemType
 import com.ymz.basicplanner.model.module.ModulePrescription
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 
 private val CODE_BG = Color(0xFF0B0C0E)
 private val CODE_LINE = 19.sp
@@ -184,47 +189,86 @@ fun ModuleEditorScreen(
                     )
                 }
             } else {
-                val chosen = families.find { it.id == itemFamilyId }
+                val selectable = families.filter { it.itemType != ItemType.IMAGE }
+                val chosen = selectable.find { it.id == itemFamilyId }
+                var expanded by remember { mutableStateOf(false) }
+
+                // The card itself is the dropdown: no duplicated title, one target to tap.
                 StatCard {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = chosen?.name ?: "pick an item",
-                                color = if (chosen != null) TextPrimary else TextMuted,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = chosen?.let { it.itemType.name.lowercase() + " · ctx[\"item\"]" }
-                                    ?: "the function reads this one value",
-                                color = TextMuted,
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace
+                    Box {
+                        Row(
+                            // No clip on this row: clipping at the text origin shaved the first
+                            // glyph of the monospace subtitle.
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = selectable.isNotEmpty()) { expanded = true }
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = chosen?.name ?: "choose an item",
+                                    color = if (chosen != null) TextPrimary else TextMuted,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = chosen?.let { "passed to apply() as " + it.itemType.name.lowercase() }
+                                        ?: "every item except images",
+                                    color = TextMuted,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 1
+                                )
+                            }
+                            Icon(
+                                Icons.Default.ArrowDropDown,
+                                contentDescription = "choose item",
+                                tint = AccentOrange
                             )
                         }
-                        Box(
-                            Modifier
-                                .width(8.dp)
-                                .height(8.dp)
-                                .clip(CircleShape)
-                                .background(if (chosen != null) AccentOrange else TextMuted.copy(alpha = 0.4f))
-                        )
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        families.chunked(3).forEach { row ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                row.forEach { family ->
-                                    Chip(
-                                        label = family.name,
-                                        selected = family.id == itemFamilyId,
-                                        onClick = { itemFamilyId = family.id }
-                                    )
-                                }
+
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier.background(DarkSurfaceAlt)
+                        ) {
+                            selectable.forEach { family ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = family.name,
+                                                color = if (family.id == itemFamilyId) AccentOrange else TextPrimary,
+                                                fontSize = 13.sp,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Text(
+                                                text = family.itemType.name.lowercase(),
+                                                color = TextMuted,
+                                                fontSize = 9.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        itemFamilyId = family.id
+                                        expanded = false
+                                    }
+                                )
                             }
                         }
+                    }
+
+                    if (selectable.isEmpty()) {
+                        Text(
+                            "No usable item: images cannot feed a module.",
+                            color = AccentRed,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
                     }
                 }
             }
@@ -257,7 +301,7 @@ fun ModuleEditorScreen(
                     onValueChange = { code = it },
                     modifier = Modifier
                         .widthIn(min = codeWidth)
-                        .heightIn(min = 300.dp),
+                        .heightIn(min = 200.dp),
                     textStyle = codeStyle.copy(color = TextPrimary),
                     cursorBrush = SolidColor(AccentOrange),
                     visualTransformation = PythonHighlightTransformation
@@ -276,7 +320,7 @@ fun ModuleEditorScreen(
                 ReturnStat("time", returned?.time?.let { "${it}s" }, Modifier.weight(1f))
             }
             Text(
-                text = "return {\"sets\": n, \"reps\": n, \"percent\": n, \"time\": n}  ·  None = leave the plan as is",
+                text = "return sets, reps, percent, time  ·  None = keep the plan",
                 color = TextMuted.copy(alpha = 0.75f),
                 fontFamily = FontFamily.Monospace,
                 fontSize = 9.sp,
@@ -363,9 +407,10 @@ fun ModuleEditorScreen(
                     )
                     val sampleValue = (chosen?.defaultValue ?: "").replace("\"", "\\\"")
                     val sampleName = (chosen?.name ?: "").replace("\"", "\\\"")
+                    val sampleType = chosen?.itemType?.name?.lowercase() ?: "string"
                     val json = """{"date":"${java.time.LocalDate.now()}","program_id":0,""" +
                         """"target":{"kind":"test","id":0,"name":"test"},""" +
-                        """"item":{"name":"$sampleName","value":"$sampleValue"},""" +
+                        """"item":{"name":"$sampleName","type":"$sampleType","value":"$sampleValue"},""" +
                         """"items":{},"sets":[{"id":1,"exerciseId":0,"exercise":"test","movement":"test",""" +
                         """"reps":5,"intensity":80,"rest":120,"weight_kg":100.0}]}"""
                     output = try {
@@ -374,8 +419,13 @@ fun ModuleEditorScreen(
                         "ERROR: ${t.message ?: t::class.simpleName}"
                     }
                     returned = try {
-                        Json { ignoreUnknownKeys = true }
-                            .decodeFromString(ModulePrescription.serializer(), output.orEmpty())
+                        val array = Json.parseToJsonElement(output.orEmpty()).jsonArray
+                        ModulePrescription(
+                            sets = array.getOrNull(0)?.toString()?.toIntOrNull(),
+                            reps = array.getOrNull(1)?.toString()?.toIntOrNull(),
+                            percent = array.getOrNull(2)?.toString()?.toDoubleOrNull(),
+                            time = array.getOrNull(3)?.toString()?.toIntOrNull()
+                        )
                     } catch (t: Throwable) {
                         null
                     }

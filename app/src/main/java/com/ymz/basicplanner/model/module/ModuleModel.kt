@@ -22,8 +22,8 @@ data class ModuleInputBinding(
 )
 
 /**
- * A Python function `apply(ctx)` that reads exactly one item and returns the prescription to apply
- * to every set it covers: `{"sets": n, "reps": n, "percent": n, "time": n}`.
+ * A Python function `apply(item)` that receives exactly one item value and returns the prescription
+ * for every set it covers, as a tuple: `return sets, reps, percent, time`.
  *
  * [itemFamilyId] is the single item the function may read, picked when the module is created; the
  * engine resolves its value on the target (or the closest ancestor that carries it).
@@ -39,25 +39,23 @@ data class ModuleDefinition(
 ) {
     companion object {
         const val DEFAULT_CODE: String =
-            "def apply(ctx):\n" +
-                "    # ctx[\"item\"] is the one item this module reads: {\"name\", \"value\"}\n" +
-                "    form = int(ctx[\"item\"][\"value\"])\n" +
-                "\n" +
-                "    if form >= 8:\n" +
+            "def apply(item):\n" +
+                "    # item is the value of the item you picked, already typed\n" +
+                "    # return sets, reps, percent, time — or None to keep the plan\n" +
+                "    if item >= 8:\n" +
                 "        # drained: fewer sets, one rep less, lighter, longer rest\n" +
-                "        return {\"sets\": 3, \"reps\": 4, \"percent\": 70, \"time\": 180}\n" +
+                "        return 3, 4, 70.0, 180\n" +
                 "\n" +
-                "    # fresh: run the plan as written\n" +
                 "    return None\n"
 
-        /** The four keys a module may return; anything else is ignored. */
+        /** What `apply` returns, in order. */
         const val RETURN_KEYS = "sets, reps, percent, time"
     }
 }
 
 /**
- * What `apply(ctx)` returns: the prescription for the sets it covers. Every field is optional; a
- * missing field means "leave the plan value alone".
+ * What `apply(item)` returns, once the tuple `sets, reps, percent, time` has been read back. Every
+ * field is optional; a missing field means "leave the plan value alone".
  */
 @Serializable
 data class ModulePrescription(
@@ -103,10 +101,11 @@ data class ModuleTargetInfo(
     val name: String
 )
 
-/** The one item a module reads: its family name and the value found on the target or an ancestor. */
+/** The one item a module reads: its family name, its type and the value found on the target or an ancestor. */
 @Serializable
 data class ModuleItemInfo(
     val name: String,
+    val type: String = "string",
     val value: String
 )
 
@@ -116,7 +115,7 @@ data class ModuleContext(
     val date: String,
     val program_id: Long,
     val target: ModuleTargetInfo,
-    /** The module's single item — what `apply` is allowed to read. */
+    /** The module's single item — what `apply` receives as its argument. */
     val item: ModuleItemInfo? = null,
     /** Item family name → value (kept for modules that still read the whole map). */
     val items: Map<String, String> = emptyMap(),

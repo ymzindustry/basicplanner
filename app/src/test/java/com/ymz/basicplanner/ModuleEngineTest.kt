@@ -117,8 +117,8 @@ class ModuleEngineTest {
         val f = Fixture()
         val executor = ModuleExecutor { _, contextJson ->
             // The module sees its one item, resolved on the day the target belongs to.
-            assertTrue(contextJson.contains("\"item\":{\"name\":\"form\",\"value\":\"7\"}"))
-            """{"reps":4}"""
+            assertTrue(contextJson.contains("\"item\":{\"name\":\"form\",\"type\":\"int\",\"value\":\"7\"}"))
+            "[3, 4, null, null]"
         }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment())),
@@ -136,7 +136,7 @@ class ModuleEngineTest {
     @Test
     fun percent_and_time_become_deltas_against_the_plan() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> """{"percent":75,"time":90}""" }
+        val executor = ModuleExecutor { _, _ -> "[null, null, 75, 90]" }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment())),
             activeProgramId = 80L,
@@ -151,7 +151,7 @@ class ModuleEngineTest {
     @Test
     fun a_set_count_is_kept_per_exercise() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> """{"sets":3}""" }
+        val executor = ModuleExecutor { _, _ -> "[3, null, null, null]" }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment())),
             activeProgramId = 80L,
@@ -181,7 +181,7 @@ class ModuleEngineTest {
     @Test
     fun a_module_of_another_program_does_not_touch_this_one() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> """{"reps":4}""" }
+        val executor = ModuleExecutor { _, _ -> "[null, 4, null, null]" }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment(programId = 70L))),
             activeProgramId = 81L, // other program, same exercises
@@ -196,7 +196,7 @@ class ModuleEngineTest {
     fun prescriptions_from_several_modules_add_up() {
         val f = Fixture()
         val executor = ModuleExecutor { module, _ ->
-            if (module.id == 1L) """{"reps":4}""" else """{"percent":75}"""
+            if (module.id == 1L) "[null, 4, null, null]" else "[null, null, 75, null]"
         }
         val attachments = listOf(
             dayAttachment(),
@@ -221,7 +221,7 @@ class ModuleEngineTest {
     @Test
     fun a_set_module_only_touches_its_own_set() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> """{"reps":4}""" }
+        val executor = ModuleExecutor { _, _ -> "[null, 4, null, null]" }
         val attachment = ModuleAttachment(
             id = 3L,
             moduleId = 1L,
@@ -275,7 +275,7 @@ class ModuleEngineTest {
         // The item lives on the day; the module is attached to the exercise.
         val executor = ModuleExecutor { _, contextJson ->
             assertTrue(contextJson.contains("\"value\":\"7\""))
-            """{"reps":4}"""
+            "[null, 4, null, null]"
         }
         val attachment = ModuleAttachment(
             id = 4L,

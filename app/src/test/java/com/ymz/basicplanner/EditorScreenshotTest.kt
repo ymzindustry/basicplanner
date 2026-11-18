@@ -45,13 +45,11 @@ class EditorScreenshotTest {
                 name = "Deadlift form",
                 description = "Lowers reps when form is poor",
                 code = """
-                    def apply(ctx):
-                        # the one item this module reads
-                        form = int(ctx["item"]["value"])
-
-                        if form >= 8:
+                    def apply(item):
+                        # item comes in already typed
+                        if item >= 8:
                             # drained: fewer sets, lighter, longer rest
-                            return {"sets": 3, "reps": 4, "percent": 70, "time": 180}
+                            return 3, 4, 70.0, 180
 
                         return None
                 """.trimIndent(),
