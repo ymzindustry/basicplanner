@@ -118,7 +118,7 @@ class ModuleEngineTest {
         val executor = ModuleExecutor { _, contextJson ->
             // The module sees its one item, resolved on the day the target belongs to.
             assertTrue(contextJson.contains("\"item\":{\"name\":\"form\",\"type\":\"int\",\"value\":\"7\"}"))
-            "[3, 4, null, null]"
+            "[-1, -1, -10.0, 60]"
         }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment())),
@@ -126,9 +126,11 @@ class ModuleEngineTest {
             sessionId = 20L
         )
 
-        // plan reps are 5 and 3, the module asks for 4 → deltas -1 and +1
+        // Modules only add deltas, from a zero baseline: every covered set takes the same -1.
         assertEquals(-1, outcome.adjustments[100L]?.repsDelta)
-        assertEquals(1, outcome.adjustments[101L]?.repsDelta)
+        assertEquals(-1, outcome.adjustments[101L]?.repsDelta)
+        assertEquals(-10.0, outcome.adjustments[100L]?.percentDelta ?: 0.0, 0.001)
+        assertEquals(60, outcome.adjustments[100L]?.restDelta)
         assertTrue(outcome.issues.isEmpty())
         assertEquals(listOf(1L), outcome.applied)
     }
@@ -136,22 +138,22 @@ class ModuleEngineTest {
     @Test
     fun percent_and_time_become_deltas_against_the_plan() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> "[null, null, 75, 90]" }
+        val executor = ModuleExecutor { _, _ -> "[0, 0, 75, 90]" }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment())),
             activeProgramId = 80L,
             sessionId = 20L
         )
 
-        assertEquals(-5.0, outcome.adjustments[100L]?.percentDelta ?: 0.0, 0.001)
-        assertEquals(-30, outcome.adjustments[100L]?.restDelta)
-        assertEquals(-15.0, outcome.adjustments[101L]?.percentDelta ?: 0.0, 0.001)
+        assertEquals(75.0, outcome.adjustments[100L]?.percentDelta ?: 0.0, 0.001)
+        assertEquals(90, outcome.adjustments[100L]?.restDelta)
+        assertEquals(75.0, outcome.adjustments[101L]?.percentDelta ?: 0.0, 0.001)
     }
 
     @Test
     fun a_set_count_is_kept_per_exercise() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> "[3, null, null, null]" }
+        val executor = ModuleExecutor { _, _ -> "[3, 0, 0, 0]" }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment())),
             activeProgramId = 80L,
@@ -181,7 +183,7 @@ class ModuleEngineTest {
     @Test
     fun a_module_of_another_program_does_not_touch_this_one() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> "[null, 4, null, null]" }
+        val executor = ModuleExecutor { _, _ -> "[0, -1, 0, 0]" }
         val outcome = ModuleEngine(executor).evaluate(
             f.app(listOf(module()), listOf(dayAttachment(programId = 70L))),
             activeProgramId = 81L, // other program, same exercises
@@ -196,7 +198,7 @@ class ModuleEngineTest {
     fun prescriptions_from_several_modules_add_up() {
         val f = Fixture()
         val executor = ModuleExecutor { module, _ ->
-            if (module.id == 1L) "[null, 4, null, null]" else "[null, null, 75, null]"
+            if (module.id == 1L) "[0, -1, 0, 0]" else "[0, 0, -5.0, 0]"
         }
         val attachments = listOf(
             dayAttachment(),
@@ -214,6 +216,7 @@ class ModuleEngineTest {
             sessionId = 20L
         )
 
+        // Inherited: -1 rep from the first module and -5% from the second add up on the same set.
         assertEquals(-1, outcome.adjustments[100L]?.repsDelta)
         assertEquals(-5.0, outcome.adjustments[100L]?.percentDelta ?: 0.0, 0.001)
     }
@@ -221,7 +224,7 @@ class ModuleEngineTest {
     @Test
     fun a_set_module_only_touches_its_own_set() {
         val f = Fixture()
-        val executor = ModuleExecutor { _, _ -> "[null, 4, null, null]" }
+        val executor = ModuleExecutor { _, _ -> "[0, -1, 0, 0]" }
         val attachment = ModuleAttachment(
             id = 3L,
             moduleId = 1L,
@@ -275,7 +278,7 @@ class ModuleEngineTest {
         // The item lives on the day; the module is attached to the exercise.
         val executor = ModuleExecutor { _, contextJson ->
             assertTrue(contextJson.contains("\"value\":\"7\""))
-            "[null, 4, null, null]"
+            "[0, -1, 0, 0]"
         }
         val attachment = ModuleAttachment(
             id = 4L,

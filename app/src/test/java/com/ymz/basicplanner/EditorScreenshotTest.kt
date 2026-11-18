@@ -47,11 +47,12 @@ class EditorScreenshotTest {
                 code = """
                     def apply(item):
                         # item comes in already typed
+                        # deltas, from a zero baseline
                         if item >= 8:
-                            # drained: fewer sets, lighter, longer rest
-                            return 3, 4, 70.0, 180
+                            # drained: one set less, 10% lighter
+                            return -1, -1, -10.0, 60
 
-                        return None
+                        return 0, 0, 0.0, 0
                 """.trimIndent(),
                 itemFamilyId = 90L,
                 itemName = "form"

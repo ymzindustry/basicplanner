@@ -124,8 +124,10 @@ class ModuleEngine(private val executor: ModuleExecutor) {
             .sortedWith(compareBy({ breadth(it.targetKind) }, { it.id }))
         if (attachments.isEmpty()) return ModuleOutcome()
 
-        val deltaBySet = mutableMapOf<Long, SetAdjustment>()
-        val byExercise = mutableMapOf<Long, MutableList<ModulePrescription>>()
+        // Every session starts from zero: modules only add deltas, and each one inherits what the
+        // previous ones already asked for.
+        val totalsByExercise = mutableMapOf<Long, ModulePrescription>()
+        val setIdsByExercise = mutableMapOf<Long, MutableSet<Long>>()
         val applied = mutableListOf<Long>()
         val issues = mutableListOf<ModuleRunIssue>()
 
@@ -149,31 +151,32 @@ class ModuleEngine(private val executor: ModuleExecutor) {
                 return@forEach
             } ?: return@forEach
 
-            var changed = false
+            if (prescription.isIdentity()) return@forEach
+
             affected.forEach { (exercise, entry) ->
-                val current = deltaBySet[entry.id] ?: SetAdjustment()
-                val updated = SetAdjustment(
-                    repsDelta = current.repsDelta + (prescription.reps?.minus(entry.reps) ?: 0),
-                    percentDelta = current.percentDelta +
-                        (prescription.percent?.minus(entry.intensity.toDouble()) ?: 0.0),
-                    kgDelta = current.kgDelta,
-                    restDelta = current.restDelta + (prescription.time?.minus(entry.rest) ?: 0)
-                )
-                if (updated != current) {
-                    deltaBySet[entry.id] = updated
-                    changed = true
-                }
-                if (prescription.sets != null) {
-                    byExercise.getOrPut(exercise.id) { mutableListOf() }.add(prescription)
-                    changed = true
-                }
+                setIdsByExercise.getOrPut(exercise.id) { mutableSetOf() }.add(entry.id)
             }
-            if (changed) applied += module.id
+            affected.map { it.first.id }.distinct().forEach { exerciseId ->
+                totalsByExercise[exerciseId] =
+                    (totalsByExercise[exerciseId] ?: ModulePrescription()) + prescription
+            }
+            applied += module.id
         }
 
+        val adjustments = setIdsByExercise.flatMap { (exerciseId, setIds) ->
+            val totals = totalsByExercise[exerciseId] ?: return@flatMap emptyList()
+            setIds.map { setId ->
+                setId to SetAdjustment(
+                    repsDelta = totals.reps,
+                    percentDelta = totals.percent,
+                    restDelta = totals.time
+                )
+            }
+        }.toMap().filterValues { !it.isIdentity() }
+
         return ModuleOutcome(
-            adjustments = deltaBySet.filterValues { !it.isIdentity() },
-            prescriptions = byExercise.mapValues { (_, list) -> mergePrescriptions(list) },
+            adjustments = adjustments,
+            prescriptions = totalsByExercise.filterValues { it.sets != 0 },
             applied = applied.distinct(),
             issues = issues
         )
@@ -197,6 +200,10 @@ class ModuleEngine(private val executor: ModuleExecutor) {
      * `apply` returns `sets, reps, percent, time` — a Python tuple, so a JSON array here — or None
      * to leave the plan alone. Missing trailing values mean "keep the plan value".
      */
+    /**
+     * `apply` returns `sets, reps, percent, time` — a Python tuple, so a JSON array here — as deltas.
+     * `None` means "no change"; a missing trailing value counts as zero.
+     */
     private fun parseOutput(output: String): ModulePrescription? {
         val trimmed = output.trim()
         if (trimmed.isEmpty() || trimmed == "[]" || trimmed == "{}" ||
@@ -205,25 +212,15 @@ class ModuleEngine(private val executor: ModuleExecutor) {
             return null
         }
         val array = json.parseToJsonElement(trimmed).jsonArray
-        fun Int.index(): kotlinx.serialization.json.JsonPrimitive? =
+        fun Int.value(): kotlinx.serialization.json.JsonPrimitive? =
             array.getOrNull(this) as? kotlinx.serialization.json.JsonPrimitive
-        val prescription = ModulePrescription(
-            sets = 0.index()?.contentOrNull?.toIntOrNull(),
-            reps = 1.index()?.contentOrNull?.toIntOrNull(),
-            percent = 2.index()?.contentOrNull?.toDoubleOrNull(),
-            time = 3.index()?.contentOrNull?.toIntOrNull()
+        return ModulePrescription(
+            sets = 0.value()?.contentOrNull?.toIntOrNull() ?: 0,
+            reps = 1.value()?.contentOrNull?.toIntOrNull() ?: 0,
+            percent = 2.value()?.contentOrNull?.toDoubleOrNull() ?: 0.0,
+            time = 3.value()?.contentOrNull?.toIntOrNull() ?: 0
         )
-        return if (prescription.isIdentity()) null else prescription
     }
-
-    /** Several modules on the same exercise: the last one to ask for a set count wins, the rest merge. */
-    private fun mergePrescriptions(list: List<ModulePrescription>): ModulePrescription =
-        ModulePrescription(
-            sets = list.lastOrNull { it.sets != null }?.sets,
-            reps = list.lastOrNull { it.reps != null }?.reps,
-            percent = list.lastOrNull { it.percent != null }?.percent,
-            time = list.lastOrNull { it.time != null }?.time
-        )
 
     private fun breadth(kind: ModuleTargetKind): Int = when (kind) {
         ModuleTargetKind.DAY -> 0

@@ -22,8 +22,8 @@ data class ModuleInputBinding(
 )
 
 /**
- * A Python function `apply(item)` that receives exactly one item value and returns the prescription
- * for every set it covers, as a tuple: `return sets, reps, percent, time`.
+ * A Python function `apply(item)` that receives exactly one item value and returns four deltas for
+ * every set it covers: `return sets, reps, percent, time`.
  *
  * [itemFamilyId] is the single item the function may read, picked when the module is created; the
  * engine resolves its value on the target (or the closest ancestor that carries it).
@@ -40,13 +40,14 @@ data class ModuleDefinition(
     companion object {
         const val DEFAULT_CODE: String =
             "def apply(item):\n" +
-                "    # item is the value of the item you picked, already typed\n" +
-                "    # return sets, reps, percent, time — or None to keep the plan\n" +
+                "    # item: the value of the item you picked, already typed\n" +
+                "    # return sets, reps, percent, time — deltas added to the plan\n" +
+                "    # everything starts at zero, so 0 means \"no change\"\n" +
                 "    if item >= 8:\n" +
-                "        # drained: fewer sets, one rep less, lighter, longer rest\n" +
-                "        return 3, 4, 70.0, 180\n" +
+                "        # drained: one set less, one rep less, 10% lighter, +60 s rest\n" +
+                "        return -1, -1, -10.0, 60\n" +
                 "\n" +
-                "    return None\n"
+                "    return 0, 0, 0.0, 0\n"
 
         /** What `apply` returns, in order. */
         const val RETURN_KEYS = "sets, reps, percent, time"
@@ -54,17 +55,28 @@ data class ModuleDefinition(
 }
 
 /**
- * What `apply(item)` returns, once the tuple `sets, reps, percent, time` has been read back. Every
- * field is optional; a missing field means "leave the plan value alone".
+ * The four values a module returns — `sets, reps, percent, time` — read as **deltas** added to the
+ * plan. They start at zero for every session and are inherited from module to module: each one adds
+ * its own numbers on top of what the previous ones asked for.
+ *
+ * Zero means "no change", which is why the baseline is zero and not null.
  */
 @Serializable
 data class ModulePrescription(
-    val sets: Int? = null,
-    val reps: Int? = null,
-    val percent: Double? = null,
-    val time: Int? = null
+    val sets: Int = 0,
+    val reps: Int = 0,
+    val percent: Double = 0.0,
+    val time: Int = 0
 ) {
-    fun isIdentity(): Boolean = sets == null && reps == null && percent == null && time == null
+    fun isIdentity(): Boolean = sets == 0 && reps == 0 && percent == 0.0 && time == 0
+
+    /** Inheritance: the next module starts from what the previous ones already asked for. */
+    operator fun plus(other: ModulePrescription) = ModulePrescription(
+        sets = sets + other.sets,
+        reps = reps + other.reps,
+        percent = percent + other.percent,
+        time = time + other.time
+    )
 }
 
 /**
