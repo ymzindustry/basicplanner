@@ -152,13 +152,14 @@ fun ModuleEditorScreen(
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .statusBarsPadding()
+                    .padding(top = 22.dp)   // breathing room, as on the session screen
             ) {
                 BasicTextField(
                     value = code,
                     onValueChange = { code = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 12.dp),
+                        .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 12.dp),
                     textStyle = TextStyle(
                         color = TextPrimary,
                         fontFamily = FontFamily.Monospace,
