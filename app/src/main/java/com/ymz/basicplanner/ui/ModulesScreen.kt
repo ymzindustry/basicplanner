@@ -27,6 +27,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -64,6 +66,7 @@ import com.ymz.basicplanner.compose.ScrollingText
 import com.ymz.basicplanner.data.AppStateStore
 import com.ymz.basicplanner.data.PythonModuleExecutor
 import com.ymz.basicplanner.model.CreationState
+import com.ymz.basicplanner.compose.highlightPython
 import com.ymz.basicplanner.model.ItemType
 import com.ymz.basicplanner.model.ItemFamily
 import com.ymz.basicplanner.model.module.ModuleAttachment
@@ -78,7 +81,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ModulesScreen(
     creationState: CreationState,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    initiallyExpandedModuleId: Long? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -159,18 +163,12 @@ fun ModulesScreen(
                         val attachments = creationState.moduleAttachments.filter { it.moduleId == module.id }
                         ModuleCard(
                             module = module,
+                            initiallyExpanded = module.id == initiallyExpandedModuleId,
                             attachments = attachments,
                             attachmentLabel = { attachment ->
                                 val target = attachmentLabel(creationState, attachment)
                                 val program = creationState.programs.find { it.id == attachment.programId }?.name
                                 listOfNotNull(program, target).joinToString(" · ")
-                            },
-                            inputLabel = module.itemName.ifBlank { "no input" } + " · " +
-                                (creationState.itemFamilies.find { it.id == module.itemFamilyId }
-                                    ?.itemType?.name?.lowercase() ?: "—"),
-                            onOpen = {
-                                editingReadOnly = true
-                                editingModuleId = module.id
                             },
                             onEdit = {
                                 editingReadOnly = false
@@ -318,10 +316,9 @@ private fun attachmentLabel(creationState: CreationState, attachment: ModuleAtta
 @Composable
 private fun ModuleCard(
     module: ModuleDefinition,
+    initiallyExpanded: Boolean = false,
     attachments: List<ModuleAttachment>,
     attachmentLabel: (ModuleAttachment) -> String,
-    inputLabel: String,
-    onOpen: () -> Unit,
     onEdit: () -> Unit,
     onChangeInput: () -> Unit,
     onRename: () -> Unit,
@@ -329,8 +326,12 @@ private fun ModuleCard(
     onDetach: (ModuleAttachment) -> Unit,
     onDelete: () -> Unit
 ) {
-    // Same row anatomy as a session's exercise row: bold title, mono subtitle, trailing actions,
-    // then the targets listed underneath like sets.
+    // One line per module — the signature — and tapping it unfolds the code, exactly like an
+    // exercise row in the session screen unfolds its sets.
+    var expanded by remember(module.id) { mutableStateOf(initiallyExpanded) }
+    val signature = "def " + ModuleDefinition.pythonFunctionName(module.name) +
+        "(" + ModuleDefinition.pythonParameterName(module.itemName) + "):"
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -340,37 +341,23 @@ private fun ModuleCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onOpen)
-                .padding(start = 14.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+                .clickable { expanded = !expanded }
+                .padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = module.name,
-                    color = TextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = ModuleDefinition.pythonFunctionName(module.name) + "(" +
-                        ModuleDefinition.pythonParameterName(module.itemName) + ")",
-                    color = TextMuted,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
             Text(
-                text = inputLabel,
-                color = AccentOrange.copy(alpha = 0.85f),
+                text = signature,
+                color = TextPrimary,
                 fontFamily = FontFamily.Monospace,
-                fontSize = 10.sp,
+                fontSize = 14.sp,
                 maxLines = 1,
-                modifier = Modifier.padding(end = 2.dp)
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "hide code" else "show code",
+                tint = TextMuted
             )
 
             var menuOpen by remember { mutableStateOf(false) }
@@ -408,44 +395,53 @@ private fun ModuleCard(
             }
         }
 
-        attachments.forEach { attachment ->
+        if (expanded) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(TextMuted.copy(alpha = 0.10f)))
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 260.dp)
+                    .background(DarkBackground)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
-                Text("→", color = AccentOrange, fontSize = 12.sp)
-                Spacer(Modifier.width(8.dp))
                 Text(
-                    text = attachmentLabel(attachment),
-                    color = TextMuted,
+                    text = highlightPython(module.code),
+                    color = TextPrimary,
+                    fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    "remove",
-                    color = AccentRed.copy(alpha = 0.9f),
-                    fontSize = 10.sp,
-                    modifier = Modifier.clickable { onDetach(attachment) }.padding(4.dp)
+                    lineHeight = 17.sp
                 )
             }
-        }
 
-        if (attachments.isEmpty()) {
-            Box(Modifier.fillMaxWidth().height(1.dp).background(TextMuted.copy(alpha = 0.10f)))
-            Text(
-                text = "not attached",
-                color = TextMuted.copy(alpha = 0.6f),
-                fontSize = 10.sp,
-                modifier = Modifier.padding(start = 14.dp, top = 8.dp, bottom = 8.dp)
-            )
+            attachments.forEach { attachment ->
+                Box(Modifier.fillMaxWidth().height(1.dp).background(TextMuted.copy(alpha = 0.10f)))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("→", color = AccentOrange, fontSize = 12.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = attachmentLabel(attachment),
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        "remove",
+                        color = AccentRed.copy(alpha = 0.9f),
+                        fontSize = 10.sp,
+                        modifier = Modifier.clickable { onDetach(attachment) }.padding(4.dp)
+                    )
+                }
+            }
         }
     }
 }
 
-/** Change the input of an existing module — the only place it is editable after creation. */
 /**
  * Attach a module to one target of one program: choose the program, the kind of target, the target
  * itself, then bind each declared input to an item of the target or one of its ancestors.

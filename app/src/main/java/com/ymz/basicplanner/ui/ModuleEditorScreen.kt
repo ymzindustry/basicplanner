@@ -141,14 +141,28 @@ fun ModuleEditorScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // The module's name at the top of its own file — no back arrow here, that lives in the
+            // bottom bar on every screen.
+            Text(
+                text = module.name.ifBlank { "module" },
+                color = TextPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 2.dp)
+            )
+
             // Code directly on the black background, filling everything left.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .statusBarsPadding()
-                    .padding(top = 46.dp)   // same first-line height as the session screen
+                    .padding(top = 2.dp)
             ) {
                 BasicTextField(
                     value = code,
@@ -156,7 +170,7 @@ fun ModuleEditorScreen(
                     readOnly = readOnly,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 12.dp),
+                        .padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 12.dp),
                     textStyle = TextStyle(
                         color = TextPrimary,
                         fontFamily = FontFamily.Monospace,

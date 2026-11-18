@@ -27,8 +27,7 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ModulesScreenshotTest {
 
-    @Test
-    fun modules_list_renders() {
+    private fun render(expandedId: Long?, out: String) {
         val cs = CreationState()
         cs.itemFamilies.addAll(
             listOf(
@@ -41,6 +40,7 @@ class ModulesScreenshotTest {
                 id = 1L,
                 name = "Deadlift form",
                 description = "Lowers reps when form is poor",
+                code = ModuleDefinition.defaultCodeFor("Deadlift form", "form"),
                 itemFamilyId = 90L,
                 itemName = "form"
             )
@@ -50,6 +50,7 @@ class ModulesScreenshotTest {
                 id = 2L,
                 name = "Deload week",
                 description = "Drops intensity on the last week",
+                code = ModuleDefinition.defaultCodeFor("Deload week", "week"),
                 itemFamilyId = 90L,
                 itemName = "week"
             )
@@ -66,13 +67,13 @@ class ModulesScreenshotTest {
 
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
         val view = ComposeView(activity).apply {
-            setContent { ModulesScreen(creationState = cs, onBack = {}) }
+            setContent { ModulesScreen(creationState = cs, onBack = {}, initiallyExpandedModuleId = expandedId) }
         }
         activity.setContentView(view)
         ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
 
         val width = 1080
-        val height = 1600
+        val height = 1700
         view.measure(
             View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
@@ -82,8 +83,14 @@ class ModulesScreenshotTest {
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
-        File("/tmp/modules.png").outputStream().use { out ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        File(out).outputStream().use { stream ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
         }
     }
+
+    @Test
+    fun modules_list_collapsed() = render(null, "/tmp/modules.png")
+
+    @Test
+    fun modules_list_expanded() = render(1L, "/tmp/modules_expanded.png")
 }
