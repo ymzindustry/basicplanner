@@ -27,6 +27,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -59,6 +62,8 @@ import com.ymz.basicplanner.compose.ScrollingText
 import com.ymz.basicplanner.data.AppStateStore
 import com.ymz.basicplanner.data.PythonModuleExecutor
 import com.ymz.basicplanner.model.CreationState
+import com.ymz.basicplanner.model.ItemType
+import com.ymz.basicplanner.model.ItemFamily
 import com.ymz.basicplanner.model.module.ModuleAttachment
 import com.ymz.basicplanner.model.module.ModuleDefinition
 import com.ymz.basicplanner.model.module.ModuleTargetKind
@@ -88,6 +93,7 @@ fun ModulesScreen(
         )
         return
     }
+    var creating by remember { mutableStateOf(false) }
     var attachingTo by remember { mutableStateOf<ModuleDefinition?>(null) }
     var deleting by remember { mutableStateOf<ModuleDefinition?>(null) }
 
@@ -126,17 +132,7 @@ fun ModulesScreen(
                     modifier = Modifier.weight(1f)
                 )
                 Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
-                    IconButton(onClick = {
-                        val newModule = ModuleDefinition(
-                            id = creationState.newId(),
-                            name = "new module",
-                            code = ModuleDefinition.DEFAULT_CODE,
-                            itemFamilyId = null
-                        )
-                        creationState.modules.add(newModule)
-                        scope.launch { AppStateStore.save(context, creationState.toAppState()) }
-                        editingModuleId = newModule.id
-                    }) {
+                    IconButton(onClick = { creating = true }) {
                         Icon(Icons.Default.Add, "new module", tint = AccentOrange)
                     }
                 }
@@ -179,6 +175,26 @@ fun ModulesScreen(
                 }
             }
         }
+    }
+
+    if (creating) {
+        NewModuleDialog(
+            creationState = creationState,
+            onDismiss = { creating = false },
+            onCreate = { name, family ->
+                val newModule = ModuleDefinition(
+                    id = creationState.newId(),
+                    name = name,
+                    code = ModuleDefinition.defaultCodeFor(family.name),
+                    itemFamilyId = family.id,
+                    itemName = family.name
+                )
+                creationState.modules.add(newModule)
+                scope.launch { AppStateStore.save(context, creationState.toAppState()) }
+                creating = false
+                editingModuleId = newModule.id
+            }
+        )
     }
 
     attachingTo?.let { module ->
@@ -436,6 +452,113 @@ private fun AttachModuleDialog(
                 enabled = ready
             ) {
                 Text("Attach", color = if (ready) AccentOrange else TextMuted, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } }
+    )
+}
+
+/**
+ * Creating a module asks the two things the function needs: a name, and the single item it takes as
+ * input (every item except images). Everything after that happens in the editor.
+ */
+@Composable
+private fun NewModuleDialog(
+    creationState: CreationState,
+    onDismiss: () -> Unit,
+    onCreate: (String, ItemFamily) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var familyId by remember { mutableStateOf<Long?>(null) }
+    var expanded by remember { mutableStateOf(false) }
+
+    val selectable = creationState.itemFamilies.filter { it.itemType != ItemType.IMAGE }
+    val chosen = selectable.find { it.id == familyId }
+    val ready = name.isNotBlank() && chosen != null
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DarkSurfaceAlt,
+        title = { Text("New module", color = TextPrimary, fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text("Name", color = TextMuted, fontSize = 11.sp)
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    placeholder = { Text("Deadlift form", color = TextMuted.copy(alpha = 0.5f), fontSize = 13.sp) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentOrange,
+                        unfocusedBorderColor = TextMuted.copy(alpha = 0.3f),
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        cursorColor = AccentOrange
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(14.dp))
+                Text("Input", color = TextMuted, fontSize = 11.sp)
+                Spacer(Modifier.height(4.dp))
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(DarkSurface)
+                            .clickable(enabled = selectable.isNotEmpty()) { expanded = true }
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = chosen?.let { it.name + "  ·  " + it.itemType.name.lowercase() }
+                                ?: if (selectable.isEmpty()) "no item available" else "choose an item",
+                            color = if (chosen != null) AccentOrange else TextMuted,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(Icons.Default.ArrowDropDown, "choose input", tint = AccentOrange)
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.background(DarkSurfaceAlt)
+                    ) {
+                        selectable.forEach { family ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = family.name,
+                                        color = if (family.id == familyId) AccentOrange else TextPrimary,
+                                        fontSize = 13.sp
+                                    )
+                                },
+                                onClick = {
+                                    familyId = family.id
+                                    if (name.isBlank()) name = family.name
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = "the function will read def apply(" +
+                        (chosen?.let { ModuleDefinition.pythonParameterName(it.name) } ?: "item") + "):",
+                    color = TextMuted.copy(alpha = 0.7f),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { if (ready) onCreate(name.trim(), chosen!!) }, enabled = ready) {
+                Text("Create", color = if (ready) AccentOrange else TextMuted, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } }

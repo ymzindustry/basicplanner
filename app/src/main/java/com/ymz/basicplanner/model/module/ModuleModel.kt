@@ -38,6 +38,39 @@ data class ModuleDefinition(
     val itemName: String = ""
 ) {
     companion object {
+        /**
+         * The prototype the editor starts from: the parameter is named after the chosen item
+         * (`apply(max)`, `apply(note)` …), because that is the value the function receives.
+         */
+        fun defaultCodeFor(itemName: String): String {
+            val param = pythonParameterName(itemName)
+            return "def apply($param):\n" +
+                "    # $param: the value of this item, already typed\n" +
+                "    # return sets, reps, percent, time — deltas added to the plan\n" +
+                "    # everything starts at zero, so 0 means \"no change\"\n" +
+                "    if $param >= 8:\n" +
+                "        # drained: one set less, one rep less, 10% lighter, +60 s rest\n" +
+                "        return -1, -1, -10.0, 60\n" +
+                "\n" +
+                "    return 0, 0, 0.0, 0\n"
+        }
+
+        /** `max effort` → `max_effort`; falls back to `item` for keywords and unusable names. */
+        fun pythonParameterName(itemName: String): String {
+            val slug = itemName.trim().lowercase()
+                .replace(Regex("[^a-z0-9_]+"), "_")
+                .trim('_')
+            if (slug.isEmpty() || slug.first().isDigit() || slug in PYTHON_KEYWORDS) return "item"
+            return slug
+        }
+
+        val PYTHON_KEYWORDS = setOf(
+            "def", "return", "if", "elif", "else", "for", "while", "in", "not", "and", "or",
+            "None", "True", "False", "import", "from", "as", "class", "try", "except", "finally",
+            "raise", "with", "pass", "break", "continue", "is", "lambda", "global", "assert", "del",
+            "yield", "async", "await", "nonlocal"
+        )
+
         const val DEFAULT_CODE: String =
             "def apply(item):\n" +
                 "    # item: the value of the item you picked, already typed\n" +

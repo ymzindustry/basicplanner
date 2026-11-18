@@ -44,16 +44,7 @@ class EditorScreenshotTest {
                 id = 1L,
                 name = "Deadlift form",
                 description = "Lowers reps when form is poor",
-                code = """
-                    def apply(item):
-                        # item comes in already typed
-                        # deltas, from a zero baseline
-                        if item >= 8:
-                            # drained: one set less, 10% lighter
-                            return -1, -1, -10.0, 60
-
-                        return 0, 0, 0.0, 0
-                """.trimIndent(),
+                code = ModuleDefinition.defaultCodeFor("form"),
                 itemFamilyId = 90L,
                 itemName = "form"
             )

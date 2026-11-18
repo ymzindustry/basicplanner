@@ -237,6 +237,13 @@ fun ModuleEditorScreen(
                                 }
                             },
                             onClick = {
+                                // Keep the prototype honest: apply(form) → apply(max).
+                                val previous = Regex("""(?m)^\s*def\s+apply\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)""")
+                                    .find(code)?.groupValues?.get(1)
+                                val next = ModuleDefinition.pythonParameterName(family.name)
+                                if (previous != null && previous != next) {
+                                    code = Regex("\\b" + Regex.escape(previous) + "\\b").replace(code, next)
+                                }
                                 itemFamilyId = family.id
                                 expanded = false
                             }
@@ -248,10 +255,18 @@ fun ModuleEditorScreen(
             Spacer(Modifier.weight(1f))
 
             Text(
-                text = if (selectable.isEmpty()) "images cannot be inputs" else "item → apply(item)",
+                text = when {
+                    selectable.isEmpty() -> "images cannot be inputs"
+                    chosen != null -> chosen.name + " → apply(" +
+                        ModuleDefinition.pythonParameterName(chosen.name) + ")"
+                    else -> "pick the item apply() reads"
+                },
                 color = if (selectable.isEmpty()) AccentRed else TextMuted.copy(alpha = 0.7f),
                 fontFamily = FontFamily.Monospace,
-                fontSize = 9.sp
+                fontSize = 9.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 190.dp)
             )
         }
 
