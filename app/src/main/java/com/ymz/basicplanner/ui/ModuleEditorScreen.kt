@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -16,7 +15,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -46,7 +44,6 @@ import androidx.compose.ui.unit.sp
 import com.ymz.basicplanner.compose.CommonBottomBar
 import com.ymz.basicplanner.compose.highlightPython
 import com.ymz.basicplanner.data.AppStateStore
-import com.ymz.basicplanner.data.PythonModuleExecutor
 import com.ymz.basicplanner.model.CreationState
 import com.ymz.basicplanner.model.module.ModuleDefinition
 import kotlinx.coroutines.launch
@@ -78,7 +75,8 @@ fun moduleFileName(name: String): String {
 fun ModuleEditorScreen(
     creationState: CreationState,
     moduleId: Long,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    readOnly: Boolean = false
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -90,10 +88,8 @@ fun ModuleEditorScreen(
     }
 
     var code by remember(moduleId) { mutableStateOf(module.code) }
-    var output by remember(moduleId) { mutableStateOf<String?>(null) }
 
     val hasApply = Regex("""(?m)^\s*def\s+[A-Za-z_]\w*\s*\(""").containsMatchIn(code)
-    val param = ModuleDefinition.pythonParameterName(module.itemName)
 
     fun save() {
         val index = creationState.modules.indexOfFirst { it.id == moduleId }
@@ -102,22 +98,19 @@ fun ModuleEditorScreen(
         scope.launch { AppStateStore.save(context, creationState.toAppState()) }
     }
 
-    fun run() {
-        val family = creationState.itemFamilies.find { it.id == module.itemFamilyId }
-        val sampleValue = (family?.defaultValue ?: "").replace("\"", "\\\"")
-        val sampleName = module.itemName.replace("\"", "\\\"")
-        val sampleType = family?.itemType?.name?.lowercase() ?: "string"
-        val json = """{"date":"${java.time.LocalDate.now()}","program_id":0,""" +
-            """"target":{"kind":"test","id":0,"name":"test"},""" +
-            """"item":{"name":"$sampleName","type":"$sampleType","value":"$sampleValue"},""" +
-            """"items":{},"sets":[{"id":1,"exerciseId":0,"exercise":"test","movement":"test",""" +
-            """"reps":5,"intensity":80,"rest":120,"weight_kg":100.0}]}"""
-        output = try {
-            PythonModuleExecutor().run(module.copy(code = code), json)
-        } catch (t: Throwable) {
-            "ERROR: ${t.message ?: t::class.simpleName}"
+    // Modules written before the function took the module's name still say `def apply(...)`.
+    androidx.compose.runtime.LaunchedEffect(moduleId, readOnly) {
+        if (readOnly) return@LaunchedEffect
+        val signature = Regex("""(?m)^(\s*def\s+)([A-Za-z_]\w*)\s*\(""").find(module.code)
+        val target = ModuleDefinition.pythonFunctionName(module.name)
+        if (signature != null && signature.groupValues[2] == "apply" && target != "apply") {
+            val range = signature.groups[2]!!.range
+            code = module.code.substring(0, range.first) + target + module.code.substring(range.last + 1)
+            save()
         }
     }
+    val param = ModuleDefinition.pythonParameterName(module.itemName)
+
 
     Scaffold(
         containerColor = DarkBackground,
@@ -128,13 +121,16 @@ fun ModuleEditorScreen(
                     IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "back", tint = AccentOrange)
                     }
-                    IconButton(onClick = { run() }, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.PlayArrow, "run module", tint = AccentOrange)
-                    }
                 },
                 rightButtons = {
-                    TextButton(onClick = { save() }) {
-                        Text("Save", color = AccentOrange, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    if (readOnly) {
+                        TextButton(onClick = onBack) {
+                            Text("Close", color = AccentOrange, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    } else {
+                        TextButton(onClick = { save() }) {
+                            Text("Save", color = AccentOrange, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
                     }
                 }
             )
@@ -152,11 +148,12 @@ fun ModuleEditorScreen(
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .statusBarsPadding()
-                    .padding(top = 22.dp)   // breathing room, as on the session screen
+                    .padding(top = 46.dp)   // same first-line height as the session screen
             ) {
                 BasicTextField(
                     value = code,
-                    onValueChange = { code = it },
+                    onValueChange = { if (!readOnly) code = it },
+                    readOnly = readOnly,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 12.dp),
@@ -171,18 +168,6 @@ fun ModuleEditorScreen(
                 )
             }
 
-            output?.let { text ->
-                Box(Modifier.fillMaxWidth().height(1.dp).background(TextMuted.copy(alpha = 0.12f)))
-                Text(
-                    text = "→ " + text,
-                    color = if (text.startsWith("ERROR")) AccentRed else AccentGreen,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                )
-            }
         }
     }
 }

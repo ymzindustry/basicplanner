@@ -85,12 +85,14 @@ fun ModulesScreen(
 
 
     var editingModuleId by remember { mutableStateOf<Long?>(null) }
+    var editingReadOnly by remember { mutableStateOf(false) }
 
     // The editor is a full page, like opening a .py file — not a dialog.
     if (editingModuleId != null) {
         ModuleEditorScreen(
             creationState = creationState,
             moduleId = editingModuleId!!,
+            readOnly = editingReadOnly,
             onBack = { editingModuleId = null }
         )
         return
@@ -163,7 +165,17 @@ fun ModulesScreen(
                                 val program = creationState.programs.find { it.id == attachment.programId }?.name
                                 listOfNotNull(program, target).joinToString(" · ")
                             },
-                            onEdit = { editingModuleId = module.id },
+                            inputLabel = module.itemName.ifBlank { "no input" } + " · " +
+                                (creationState.itemFamilies.find { it.id == module.itemFamilyId }
+                                    ?.itemType?.name?.lowercase() ?: "—"),
+                            onOpen = {
+                                editingReadOnly = true
+                                editingModuleId = module.id
+                            },
+                            onEdit = {
+                                editingReadOnly = false
+                                editingModuleId = module.id
+                            },
                             onChangeInput = { changingInput = module },
                             onRename = { renaming = module },
                             onAttach = { attachingTo = module },
@@ -195,6 +207,7 @@ fun ModulesScreen(
                 creationState.modules.add(newModule)
                 scope.launch { AppStateStore.save(context, creationState.toAppState()) }
                 creating = false
+                editingReadOnly = false
                 editingModuleId = newModule.id
             }
         )
@@ -307,6 +320,8 @@ private fun ModuleCard(
     module: ModuleDefinition,
     attachments: List<ModuleAttachment>,
     attachmentLabel: (ModuleAttachment) -> String,
+    inputLabel: String,
+    onOpen: () -> Unit,
     onEdit: () -> Unit,
     onChangeInput: () -> Unit,
     onRename: () -> Unit,
@@ -314,34 +329,50 @@ private fun ModuleCard(
     onDetach: (ModuleAttachment) -> Unit,
     onDelete: () -> Unit
 ) {
+    // Same row anatomy as a session's exercise row: bold title, mono subtitle, trailing actions,
+    // then the targets listed underneath like sets.
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(DarkSurfaceAlt)
-            .padding(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpen)
+                .padding(start = 14.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Column(Modifier.weight(1f)) {
-                MarqueeText(
+                Text(
                     text = module.name,
                     color = TextPrimary,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                if (module.description.isNotBlank()) {
-                    Text(module.description, color = TextMuted, fontSize = 11.sp, maxLines = 2)
-                }
                 Text(
-                    text = "reads " + module.itemName.ifBlank { "— pick an item" },
-                    color = if (module.itemName.isBlank()) AccentRed else AccentOrange,
-                    fontSize = 10.sp,
+                    text = ModuleDefinition.pythonFunctionName(module.name) + "(" +
+                        ModuleDefinition.pythonParameterName(module.itemName) + ")",
+                    color = TextMuted,
                     fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            // ⋯ : open the file, change its input, rename it, delete it.
+
+            Text(
+                text = inputLabel,
+                color = AccentOrange.copy(alpha = 0.85f),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+                maxLines = 1,
+                modifier = Modifier.padding(end = 2.dp)
+            )
+
             var menuOpen by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menuOpen = true }) {
@@ -353,7 +384,8 @@ private fun ModuleCard(
                     modifier = Modifier.background(DarkSurfaceAlt)
                 ) {
                     listOf(
-                        "Open file" to onEdit,
+                        "Edit code" to onEdit,
+                        "Attach" to onAttach,
                         "Change input" to onChangeInput,
                         "Rename" to onRename,
                         "Delete" to onDelete
@@ -377,45 +409,43 @@ private fun ModuleCard(
         }
 
         attachments.forEach { attachment ->
+            Box(Modifier.fillMaxWidth().height(1.dp).background(TextMuted.copy(alpha = 0.10f)))
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("→", color = AccentOrange, fontSize = 12.sp)
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    attachmentLabel(attachment),
+                    text = attachmentLabel(attachment),
                     color = TextMuted,
                     fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    "detach",
-                    color = AccentRed,
-                    fontSize = 11.sp,
-                    modifier = Modifier
-                        .clickable { onDetach(attachment) }
-                        .padding(4.dp)
+                    "remove",
+                    color = AccentRed.copy(alpha = 0.9f),
+                    fontSize = 10.sp,
+                    modifier = Modifier.clickable { onDetach(attachment) }.padding(4.dp)
                 )
             }
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onAttach, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)) {
-                Icon(Icons.Default.Add, null, tint = AccentOrange, modifier = Modifier.width(14.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("attach", color = AccentOrange, fontSize = 12.sp)
-            }
-            Spacer(Modifier.weight(1f))
+        if (attachments.isEmpty()) {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(TextMuted.copy(alpha = 0.10f)))
             Text(
-                text = if (attachments.isEmpty()) "not attached" else "${attachments.size} target(s)",
-                color = TextMuted,
-                fontSize = 10.sp
+                text = "not attached",
+                color = TextMuted.copy(alpha = 0.6f),
+                fontSize = 10.sp,
+                modifier = Modifier.padding(start = 14.dp, top = 8.dp, bottom = 8.dp)
             )
         }
     }
 }
 
+/** Change the input of an existing module — the only place it is editable after creation. */
 /**
  * Attach a module to one target of one program: choose the program, the kind of target, the target
  * itself, then bind each declared input to an item of the target or one of its ancestors.
