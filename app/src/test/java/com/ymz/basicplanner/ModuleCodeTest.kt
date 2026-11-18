@@ -1,6 +1,7 @@
 package com.ymz.basicplanner
 
 import com.ymz.basicplanner.model.module.ModuleDefinition
+import com.ymz.basicplanner.ui.moduleFunctionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -30,6 +31,20 @@ class ModuleCodeTest {
         assertEquals("item", ModuleDefinition.pythonParameterName("3x3"))
         assertEquals("item", ModuleDefinition.pythonParameterName(""))
         assertEquals("item", ModuleDefinition.pythonParameterName("!!!"))
+    }
+
+    @Test
+    fun the_folded_row_shows_the_body_without_the_signature() {
+        val code = ModuleDefinition.defaultCodeFor("Deadlift form", "form")
+        val body = moduleFunctionBody(code)
+        assertTrue(!body.contains("def deadlift_form"))
+        assertTrue(body.contains("return 0, 0, 0.0, 0"))
+    }
+
+    @Test
+    fun a_module_without_a_signature_keeps_its_code() {
+        val body = moduleFunctionBody("print(1)")
+        assertEquals("print(1)", body)
     }
 
     @Test

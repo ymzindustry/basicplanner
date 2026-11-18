@@ -114,6 +114,19 @@ fun ModulesScreen(
     Scaffold(
         containerColor = DarkBackground,
         contentColor = TextPrimary,
+        bottomBar = {
+            CommonBottomBar(
+                leftButtons = {
+                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "back", tint = AccentOrange)
+                    }
+                    IconButton(onClick = { creating = true }, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.Add, "new module", tint = AccentOrange)
+                    }
+                },
+                rightButtons = {}
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -127,9 +140,6 @@ fun ModulesScreen(
                     .padding(horizontal = 4.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "back", tint = AccentOrange)
-                }
                 Text(
                     text = "MODULES",
                     color = TextPrimary,
@@ -138,11 +148,8 @@ fun ModulesScreen(
                     maxLines = 1,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(start = 6.dp)
+                        .padding(start = 16.dp)
                 )
-                IconButton(onClick = { creating = true }) {
-                    Icon(Icons.Default.Add, "new module", tint = AccentOrange)
-                }
             }
 
             if (creationState.modules.isEmpty()) {
@@ -313,6 +320,15 @@ private fun attachmentLabel(creationState: CreationState, attachment: ModuleAtta
         ModuleTargetKind.SET -> "Set (missing)"
     }
 
+/** The code without its `def …:` line — the row already shows that signature. */
+internal fun moduleFunctionBody(code: String): String {
+    val lines = code.lines()
+    val signature = lines.indexOfFirst { line ->
+        line.trimStart().startsWith("def ") && line.trimEnd().endsWith(":")
+    }
+    return if (signature >= 0) lines.drop(signature + 1).joinToString("\n").trimEnd() else code.trimEnd()
+}
+
 @Composable
 private fun ModuleCard(
     module: ModuleDefinition,
@@ -331,6 +347,7 @@ private fun ModuleCard(
     var expanded by remember(module.id) { mutableStateOf(initiallyExpanded) }
     val signature = "def " + ModuleDefinition.pythonFunctionName(module.name) +
         "(" + ModuleDefinition.pythonParameterName(module.itemName) + "):"
+    val body = moduleFunctionBody(module.code)
 
     Column(
         modifier = Modifier
@@ -346,8 +363,7 @@ private fun ModuleCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = signature,
-                color = TextPrimary,
+                text = highlightPython(signature),
                 fontFamily = FontFamily.Monospace,
                 fontSize = 14.sp,
                 maxLines = 1,
@@ -397,17 +413,15 @@ private fun ModuleCard(
 
         if (expanded) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(TextMuted.copy(alpha = 0.10f)))
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 260.dp)
-                    .background(DarkBackground)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 12.dp)
             ) {
                 Text(
-                    text = highlightPython(module.code),
-                    color = TextPrimary,
+                    text = highlightPython(body.ifBlank { "    pass" }),
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
                     lineHeight = 17.sp
