@@ -193,10 +193,10 @@ fun entitiesOfProgram(
  * module row's signature shape: the outline itself says "this is a module line".
  */
 class ModuleRowShape(
-    private val cornerDp: Float = 10f,
+    private val cornerDp: Float = 4f,
     private val holeDp: Float = 15f,
     /** Distance from the left edge to the hole's centre: lower = further left. */
-    private val holeCenterDp: Float = 0f
+    private val holeCenterDp: Float = 19f
 ) : androidx.compose.ui.graphics.Shape {
     override fun createOutline(
         size: androidx.compose.ui.geometry.Size,
@@ -208,30 +208,18 @@ class ModuleRowShape(
         val h = size.height
         val holeCx = with(density) { holeCenterDp.dp.toPx() }
         val path = androidx.compose.ui.graphics.Path()
-        if (holeCx <= 0.5f) {
-            // Circle centred exactly on the top-left corner: the corner is replaced by its arc.
-            path.moveTo(s, 0f)
-            path.arcTo(androidx.compose.ui.geometry.Rect(0f, 0f, 2 * s, 2 * s), 270f, -90f, false)
-            path.lineTo(0f, h - r)
-            path.quadraticTo(0f, h, r, h)
-            path.lineTo(size.width - r, h)
-            path.quadraticTo(size.width, h, size.width, h - r)
-            path.lineTo(size.width, r)
-            path.quadraticTo(size.width, 0f, size.width - r, 0f)
-            path.lineTo(s, 0f)
-        } else {
-            path.moveTo(r, 0f)
-            path.lineTo(holeCx - s, 0f)
-            path.arcTo(androidx.compose.ui.geometry.Rect(holeCx - s, -s, holeCx + s, s), 180f, -180f, false)
-            path.lineTo(size.width - r, 0f)
-            path.quadraticTo(size.width, 0f, size.width, r)
-            path.lineTo(size.width, h - r)
-            path.quadraticTo(size.width, h, size.width - r, h)
-            path.lineTo(r, h)
-            path.quadraticTo(0f, h, 0f, h - r)
-            path.lineTo(0f, r)
-            path.quadraticTo(0f, 0f, r, 0f)
-        }
+        // Semicircular hole punched in the top edge, as far left as the corner allows.
+        path.moveTo(r, 0f)
+        path.lineTo(holeCx - s, 0f)
+        path.arcTo(androidx.compose.ui.geometry.Rect(holeCx - s, -s, holeCx + s, s), 180f, -180f, false)
+        path.lineTo(size.width - r, 0f)
+        path.quadraticTo(size.width, 0f, size.width, r)
+        path.lineTo(size.width, h - r)
+        path.quadraticTo(size.width, h, size.width - r, h)
+        path.lineTo(r, h)
+        path.quadraticTo(0f, h, 0f, h - r)
+        path.lineTo(0f, r)
+        path.quadraticTo(0f, 0f, r, 0f)
         path.close()
         return androidx.compose.ui.graphics.Outline.Generic(path)
     }
@@ -279,7 +267,7 @@ fun EntityActionDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(56.dp)
-                                    .background(androidx.compose.ui.graphics.Color(0xFF0B0C0E), ModuleRowShape())
+                                    .background(androidx.compose.ui.graphics.Color.Transparent, ModuleRowShape())
                                     .border(1.dp, AccentOrange.copy(alpha = 0.6f), ModuleRowShape())
                                     .padding(start = 14.dp, end = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically

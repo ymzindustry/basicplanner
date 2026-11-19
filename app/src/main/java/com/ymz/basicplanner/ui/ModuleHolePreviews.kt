@@ -47,12 +47,12 @@ private fun PreviewShell(holeCenterDp: Float) {
         Spacer(Modifier.height(8.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             previewModules.forEach { module ->
-                val shape = ModuleRowShape(cornerDp = 10f, holeDp = 15f, holeCenterDp = holeCenterDp)
+                val shape = ModuleRowShape(cornerDp = 4f, holeDp = 15f, holeCenterDp = holeCenterDp)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .background(Color(0xFF0B0C0E), shape)
+                        .background(Color.Transparent, shape)
                         .border(1.dp, AccentOrange.copy(alpha = 0.6f), shape)
                         .padding(start = 14.dp, end = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -96,4 +96,4 @@ fun HoleVariantB() = PreviewShell(holeCenterDp = 12f)
 
 /** C · hole tangent to the left edge: the corner itself is bitten. */
 @Composable
-fun HoleVariantC() = PreviewShell(holeCenterDp = 0f)
+fun HoleVariantC() = PreviewShell(holeCenterDp = 19f)
