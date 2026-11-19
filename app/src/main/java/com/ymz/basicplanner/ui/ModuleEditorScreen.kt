@@ -2,6 +2,9 @@ package com.ymz.basicplanner.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -168,23 +171,27 @@ fun ModuleEditorScreen(
                 )
             }
 
-            // The body, in its card.
-            Column(
+            // The body: no card, just a rule on the left saying "this belongs to the function".
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 8.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(DarkSurfaceAlt)
+                    .padding(start = 16.dp, end = 10.dp, bottom = 10.dp)
             ) {
+                Box(
+                    Modifier
+                        .width(2.dp)
+                        .fillMaxHeight()
+                        .background(AccentOrange.copy(alpha = 0.45f))
+                )
                 BasicTextField(
                     value = body,
                     onValueChange = { if (!readOnly) body = it },
                     readOnly = readOnly,
                     modifier = Modifier
-                        .fillMaxWidth()
                         .weight(1f)
+                        .fillMaxHeight()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                        .padding(start = 14.dp, top = 4.dp),
                     textStyle = TextStyle(
                         color = TextPrimary,
                         fontFamily = FontFamily.Monospace,

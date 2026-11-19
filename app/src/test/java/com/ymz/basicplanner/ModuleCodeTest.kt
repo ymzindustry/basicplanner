@@ -47,7 +47,7 @@ class ModuleCodeTest {
         val code = ModuleDefinition.defaultCodeFor("Deadlift form", "form", ItemType.INT)
         val body = moduleFunctionBody(code)
         assertTrue(!body.contains("def deadlift_form"))
-        assertTrue(body.contains("return 0, 0, 0.0, 0"))
+        assertTrue(body.contains("return sets, reps, percent, time"))
     }
 
     @Test
@@ -59,8 +59,11 @@ class ModuleCodeTest {
     @Test
     fun the_default_body_returns_four_deltas() {
         val code = ModuleDefinition.defaultCodeFor("Deadlift form", "note", ItemType.INT)
-        assertTrue(code.contains("return -1, -1, -10.0, 60"))
-        assertTrue(code.contains("return 0, 0, 0.0, 0"))
+        assertTrue(code.contains("sets = 0"))
+        assertTrue(code.contains("reps = 0"))
+        assertTrue(code.contains("percent = 0.0"))
+        assertTrue(code.contains("time = 0"))
+        assertTrue(code.contains("return sets, reps, percent, time"))
         assertTrue(code.contains("if note >= 8:"))
     }
 }
