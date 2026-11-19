@@ -352,25 +352,21 @@ private fun ModuleCard(
                 IconButton(onClick = { menuOpen = true }) {
                     Icon(Icons.Default.MoreVert, "module actions", tint = TextMuted)
                 }
-                // Same menu chrome as UnifiedSelectionMenu (the app's common dropdown look).
+                // Exactly the menu the creation screen shows for an entity cell: default Material
+                // dropdown (light panel), plain labels, Delete in red.
                 DropdownMenu(
                     expanded = menuOpen,
-                    onDismissRequest = { menuOpen = false },
-                    containerColor = DarkSurfaceAlt,
-                    modifier = Modifier.border(
-                        BorderStroke(1.dp, AccentOrange),
-                        RoundedCornerShape(8.dp)
-                    )
+                    onDismissRequest = { menuOpen = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Edit code", color = TextPrimary, fontSize = 13.sp) },
+                        text = { Text("Edit code") },
                         onClick = {
                             menuOpen = false
                             onEditCode()
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Edit", color = TextPrimary, fontSize = 13.sp) },
+                        text = { Text("Edit") },
                         onClick = {
                             menuOpen = false
                             onEdit()
@@ -378,7 +374,7 @@ private fun ModuleCard(
                     )
                     if (attachments.isNotEmpty()) {
                         DropdownMenuItem(
-                            text = { Text("Remove", color = AccentRed, fontSize = 13.sp) },
+                            text = { Text("Remove", color = AccentRed) },
                             onClick = {
                                 menuOpen = false
                                 attachments.forEach(onDetach)
@@ -386,7 +382,7 @@ private fun ModuleCard(
                         )
                     }
                     DropdownMenuItem(
-                        text = { Text("Delete", color = AccentRed, fontSize = 13.sp) },
+                        text = { Text("Delete", color = AccentRed) },
                         onClick = {
                             menuOpen = false
                             onDelete()
