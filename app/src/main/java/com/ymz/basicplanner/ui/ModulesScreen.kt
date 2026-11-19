@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +51,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -183,6 +186,10 @@ fun ModulesScreen(
                             itemType = creationState.itemFamilies
                                 .find { it.id == module.itemFamilyId }?.itemType,
                             onEdit = { editingModule = module },
+                            onEditCode = {
+                                editingReadOnly = false
+                                editingModuleId = module.id
+                            },
                             onAttach = { attachingTo = module },
                             onDetach = { attachment ->
                                 creationState.moduleAttachments.remove(attachment)
@@ -301,6 +308,7 @@ private fun ModuleCard(
     attachments: List<ModuleAttachment>,
     attachmentLabel: (ModuleAttachment) -> String,
     onEdit: () -> Unit,
+    onEditCode: () -> Unit,
     onAttach: () -> Unit,
     onDetach: (ModuleAttachment) -> Unit,
     onDelete: () -> Unit
@@ -349,14 +357,21 @@ private fun ModuleCard(
                     modifier = Modifier.background(DarkSurfaceAlt)
                 ) {
                     DropdownMenuItem(
-                        text = { Text(stringResource(R.string.edit)) },
+                        text = { Text("Edit code", color = TextPrimary, fontSize = 13.sp) },
+                        onClick = {
+                            menuOpen = false
+                            onEditCode()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Edit", color = TextPrimary, fontSize = 13.sp) },
                         onClick = {
                             menuOpen = false
                             onEdit()
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text(stringResource(R.string.delete), color = AccentRed) },
+                        text = { Text("Delete", color = AccentRed, fontSize = 13.sp) },
                         onClick = {
                             menuOpen = false
                             onDelete()
@@ -366,7 +381,14 @@ private fun ModuleCard(
             }
         }
 
-        if (expanded) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = expanded,
+            enter = androidx.compose.animation.expandVertically(androidx.compose.animation.core.tween(220)) +
+                androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)),
+            exit = androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(180)) +
+                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120))
+        ) {
+            Column {
             Box(Modifier.fillMaxWidth().height(1.dp).background(TextMuted.copy(alpha = 0.10f)))
             Column(
                 modifier = Modifier
@@ -375,12 +397,19 @@ private fun ModuleCard(
                     .verticalScroll(rememberScrollState())
                     .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 12.dp)
             ) {
-                Text(
-                    text = highlightPython(body.ifBlank { "    pass" }),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    lineHeight = 17.sp
-                )
+                // One Text per line: a wrapped line loses its indentation and reads like a syntax
+                // error, so a too-long line ends with an ellipsis instead.
+                body.ifBlank { "    pass" }.lines().forEach { line ->
+                    Text(
+                        text = highlightPython(line.ifEmpty { " " }),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        lineHeight = 17.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             attachments.forEach { attachment ->
@@ -406,6 +435,7 @@ private fun ModuleCard(
                         modifier = Modifier.clickable { onDetach(attachment) }.padding(4.dp)
                     )
                 }
+            }
             }
         }
     }
@@ -635,7 +665,6 @@ private fun ModuleFormDialog(
 ) {
     var name by remember { mutableStateOf(editing?.name ?: "") }
     var familyId by remember { mutableStateOf(editing?.itemFamilyId) }
-    var expanded by remember { mutableStateOf(false) }
 
     val selectable = creationState.itemFamilies.filter { it.itemType != ItemType.IMAGE }
     val chosen = selectable.find { it.id == familyId }
@@ -647,85 +676,95 @@ private fun ModuleFormDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = DarkSurfaceAlt,
+        shape = RoundedCornerShape(20.dp),
         title = {
             Text(
                 text = if (editing == null) "New module" else "Edit module",
                 color = TextPrimary,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
         },
         text = {
             Column {
-                Text("Name", color = TextMuted, fontSize = 11.sp)
-                Spacer(Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    singleLine = true,
-                    placeholder = { Text("test", color = TextMuted.copy(alpha = 0.5f), fontSize = 13.sp) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = AccentOrange,
-                        unfocusedBorderColor = TextMuted.copy(alpha = 0.3f),
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        cursorColor = AccentOrange
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(Modifier.height(14.dp))
-                Text("Input", color = TextMuted, fontSize = 11.sp)
-                Spacer(Modifier.height(4.dp))
-                Box {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(DarkSurface)
-                            .clickable(enabled = selectable.isNotEmpty()) { expanded = true }
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = chosen?.let { it.name + "  ·  " + it.itemType.name.lowercase() }
-                                ?: if (selectable.isEmpty()) "no item available" else "choose an item",
-                            color = if (chosen != null) AccentOrange else TextMuted,
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(Icons.Default.ArrowDropDown, "choose input", tint = AccentOrange)
-                    }
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                        modifier = Modifier.background(DarkSurfaceAlt)
-                    ) {
-                        selectable.forEach { family ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = family.name,
-                                        color = if (family.id == familyId) AccentOrange else TextPrimary,
-                                        fontSize = 13.sp
-                                    )
-                                },
-                                onClick = {
-                                    familyId = family.id
-                                    if (name.isBlank()) name = family.name
-                                    expanded = false
+                Text("NAME", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(DarkSurface)
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    BasicTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        cursorBrush = SolidColor(AccentOrange),
+                        decorationBox = { inner ->
+                            Box {
+                                if (name.isEmpty()) {
+                                    Text("test", color = TextMuted.copy(alpha = 0.5f), fontSize = 14.sp)
                                 }
-                            )
+                                inner()
+                            }
+                        }
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Text("INPUT", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+
+                if (selectable.isEmpty()) {
+                    Text("No item available — images cannot feed a module.", color = AccentRed, fontSize = 11.sp)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        selectable.chunked(3).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                row.forEach { family ->
+                                    val selected = family.id == familyId
+                                    Row(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(50))
+                                            .background(if (selected) AccentOrange else DarkSurface)
+                                            .border(
+                                                width = 1.dp,
+                                                color = if (selected) AccentOrange else TextMuted.copy(alpha = 0.25f),
+                                                shape = RoundedCornerShape(50)
+                                            )
+                                            .clickable {
+                                                familyId = family.id
+                                                if (name.isBlank()) name = family.name
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = family.name,
+                                            color = if (selected) DarkBackground else TextMuted,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+
+                Spacer(Modifier.height(12.dp))
                 Text(
                     text = preview,
-                    color = TextMuted.copy(alpha = 0.7f),
+                    color = TextMuted.copy(alpha = 0.75f),
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 9.sp,
-                    modifier = Modifier.padding(top = 8.dp)
+                    fontSize = 10.sp
                 )
             }
         },
