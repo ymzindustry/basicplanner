@@ -2,6 +2,7 @@ package com.ymz.basicplanner.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicTextField
@@ -351,10 +352,15 @@ private fun ModuleCard(
                 IconButton(onClick = { menuOpen = true }) {
                     Icon(Icons.Default.MoreVert, "module actions", tint = TextMuted)
                 }
+                // Same menu chrome as UnifiedSelectionMenu (the app's common dropdown look).
                 DropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
-                    modifier = Modifier.background(DarkSurfaceAlt)
+                    containerColor = DarkSurfaceAlt,
+                    modifier = Modifier.border(
+                        BorderStroke(1.dp, AccentOrange),
+                        RoundedCornerShape(8.dp)
+                    )
                 ) {
                     DropdownMenuItem(
                         text = { Text("Edit code", color = TextPrimary, fontSize = 13.sp) },

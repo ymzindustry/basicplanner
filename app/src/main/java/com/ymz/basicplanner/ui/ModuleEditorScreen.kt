@@ -158,12 +158,12 @@ fun ModuleEditorScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 12.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = signatureTitle(signature),
-                    fontSize = 20.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -171,18 +171,12 @@ fun ModuleEditorScreen(
                 )
             }
 
-            // The body: no card, just a rule on the left saying "this belongs to the function".
+            // The body, smaller, right under the header.
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = 16.dp, end = 10.dp, bottom = 10.dp)
+                    .padding(start = 16.dp, end = 12.dp, bottom = 10.dp)
             ) {
-                Box(
-                    Modifier
-                        .width(2.dp)
-                        .fillMaxHeight()
-                        .background(AccentOrange.copy(alpha = 0.45f))
-                )
                 BasicTextField(
                     value = body,
                     onValueChange = { if (!readOnly) body = it },
@@ -191,7 +185,7 @@ fun ModuleEditorScreen(
                         .weight(1f)
                         .fillMaxHeight()
                         .verticalScroll(rememberScrollState())
-                        .padding(start = 14.dp, top = 4.dp),
+                        .padding(top = 2.dp),
                     textStyle = TextStyle(
                         color = TextPrimary,
                         fontFamily = FontFamily.Monospace,
