@@ -667,23 +667,18 @@ private fun ModuleFormDialog(
 ) {
     var name by remember { mutableStateOf(editing?.name ?: "") }
     var familyId by remember { mutableStateOf(editing?.itemFamilyId) }
+    var showItems by remember { mutableStateOf(false) }
 
     val selectable = creationState.itemFamilies.filter { it.itemType != ItemType.IMAGE }
     val chosen = selectable.find { it.id == familyId }
     val ready = name.isNotBlank() && chosen != null
-    val preview = chosen?.let {
-        ModuleDefinition.signature(name.ifBlank { "module" }, it.name, it.itemType)
-    } ?: "def module(item: int):"
 
-    // Same chrome as the movement edit dialog in the creation screen.
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(),
         containerColor = DarkSurfaceAlt,
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextMuted)
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) }
         },
         confirmButton = {
             TextButton(enabled = ready, onClick = { if (ready) onSubmit(name.trim(), chosen!!) }) {
@@ -696,86 +691,181 @@ private fun ModuleFormDialog(
         },
         title = {
             Text(
-                text = if (editing == null) "New module" else "Edit",
+                text = if (editing == null) "Create module" else "Edit module",
                 color = TextPrimary
             )
         },
         text = {
-            Column(Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name") },
-                    placeholder = { Text("Deadlift form", color = TextMuted) },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = TextMuted,
-                        focusedBorderColor = AccentOrange,
-                        unfocusedLabelColor = TextMuted,
-                        focusedLabelColor = AccentOrange,
-                        cursorColor = AccentOrange,
-                        unfocusedTextColor = TextPrimary,
-                        focusedTextColor = TextPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+            ModuleFormPreview(
+                name = name,
+                onNameChange = { name = it },
+                chosen = chosen,
+                canSelect = selectable.isNotEmpty(),
+                onSelectItem = { showItems = true }
+            )
+        }
+    )
+
+    if (showItems) {
+        ItemPickerDialog(
+            families = selectable,
+            selectedId = familyId,
+            onDismiss = { showItems = false },
+            onPick = { family ->
+                familyId = family.id
+                if (name.isBlank()) name = family.name
+                showItems = false
+            }
+        )
+    }
+}
+
+/**
+ * The module's shape, written like the code it will become: only the name is typed here, the input
+ * is picked, the body is written on the file screen.
+ */
+@Composable
+internal fun ModuleFormPreview(
+    name: String,
+    onNameChange: (String) -> Unit,
+    chosen: ItemFamily?,
+    canSelect: Boolean,
+    onSelectItem: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("def ", color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+            BasicTextField(
+                value = name,
+                onValueChange = onNameChange,
+                singleLine = true,
+                textStyle = TextStyle(
+                    color = AccentOrange,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                cursorBrush = SolidColor(AccentOrange),
+                decorationBox = { inner ->
+                    Box {
+                        if (name.isEmpty()) {
+                            Text(
+                                "name",
+                                color = TextMuted.copy(alpha = 0.5f),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 13.sp
+                            )
+                        }
+                        inner()
+                    }
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(DarkSurface)
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            )
+            Text("(", color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (chosen != null) AccentOrange.copy(alpha = 0.15f) else DarkSurface)
+                    .border(
+                        1.dp,
+                        if (chosen != null) AccentOrange.copy(alpha = 0.7f) else TextMuted.copy(alpha = 0.35f),
+                        RoundedCornerShape(50)
+                    )
+                    .clickable(enabled = canSelect, onClick = onSelectItem)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = chosen?.name ?: "select item",
+                    color = if (chosen != null) AccentOrange else TextMuted,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 96.dp)
                 )
+            }
+            Text("):", color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+        }
 
-                Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = "    body",
+            color = TextMuted.copy(alpha = 0.6f),
+            fontFamily = FontFamily.Monospace,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "    return sets, reps, percent, time",
+            color = TextMuted,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+    }
+}
 
-                Text(text = "Inputs", color = TextMuted, fontSize = 11.sp)
-                Spacer(Modifier.height(8.dp))
-
-                // Items, in the coloured bubbles used everywhere else in the app.
-                if (selectable.isEmpty()) {
-                    Text("No item available — images cannot feed a module.", color = AccentRed, fontSize = 12.sp)
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        selectable.chunked(3).forEach { row ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                row.forEach { family ->
-                                    val color = itemTypeColor(family.itemType)
-                                    val selected = family.id == familyId
-                                    Box(
-                                        modifier = Modifier
-                                            .height(40.dp)
-                                            .widthIn(max = 168.dp)
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(color.copy(alpha = if (selected) 0.28f else 0.12f))
-                                            .border(
-                                                width = 1.dp,
-                                                color = color.copy(alpha = if (selected) 0.95f else 0.5f),
-                                                shape = RoundedCornerShape(14.dp)
-                                            )
-                                            .clickable {
-                                                familyId = family.id
-                                                if (name.isBlank()) name = family.name
-                                            }
-                                            .padding(horizontal = 10.dp),
-                                        contentAlignment = Alignment.CenterStart
-                                    ) {
-                                        Text(
-                                            text = family.name,
-                                            color = TextPrimary,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
+/** The item chooser opened from the module form: the app's coloured bubbles, nothing else. */
+@Composable
+private fun ItemPickerDialog(
+    families: List<ItemFamily>,
+    selectedId: Long?,
+    onDismiss: () -> Unit,
+    onPick: (ItemFamily) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(),
+        containerColor = DarkSurfaceAlt,
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } },
+        title = { Text("Select item", color = TextPrimary) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                families.chunked(2).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { family ->
+                            val color = itemTypeColor(family.itemType)
+                            val selected = family.id == selectedId
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(42.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(color.copy(alpha = if (selected) 0.28f else 0.12f))
+                                    .border(
+                                        1.dp,
+                                        color.copy(alpha = if (selected) 0.95f else 0.5f),
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .clickable { onPick(family) }
+                                    .padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = family.name,
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
                     }
                 }
-
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    text = preview,
-                    color = TextMuted,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp
-                )
             }
         }
     )
