@@ -91,9 +91,10 @@ fun CreationScreen(
     val step = 60f
     var showDialog by remember { mutableStateOf(false) }
     // Long-press flow: entity action → module picker → input entity → attachment.
-    var entityAction by remember { mutableStateOf<Pair<BaseEntity, EntityKind>?>(null) }
-    var modulePickerFor by remember { mutableStateOf<Pair<BaseEntity, EntityKind>?>(null) }
-    var attachTarget by remember { mutableStateOf<Pair<BaseEntity, EntityKind>?>(null) }
+    // pressed entity → kind → the row root of the current section (the scope an input may come from)
+    var entityAction by remember { mutableStateOf<Triple<BaseEntity, EntityKind, BaseEntity>?>(null) }
+    var modulePickerFor by remember { mutableStateOf<Triple<BaseEntity, EntityKind, BaseEntity>?>(null) }
+    var attachTarget by remember { mutableStateOf<Triple<BaseEntity, EntityKind, BaseEntity>?>(null) }
     var attachingModule by remember { mutableStateOf<com.ymz.basicplanner.model.module.ModuleDefinition?>(null) }
     var attachError by remember { mutableStateOf<String?>(null) }
     var editingEntity by remember { mutableStateOf<BaseEntity?>(null) }
@@ -310,7 +311,7 @@ fun CreationScreen(
                             enabled = !tutorialActive,
                             onLongPress = { pressed, pressedKind ->
                                 if (!tutorialActive) {
-                                    entityAction = pressed to pressedKind
+                                    entityAction = Triple(pressed, pressedKind, entity)
                                 }
                             },
 
@@ -482,7 +483,10 @@ fun CreationScreen(
         }
     }
 
-    entityAction?.let { (pressed, pressedKind) ->
+    entityAction?.let { action ->
+        val pressed = action.first
+        val pressedKind = action.second
+        val scopeRoot = action.third
         val kind = moduleTargetKindOf(pressedKind)
         val adjustment = when (pressed) {
             is com.ymz.basicplanner.model.SessionEntity -> pressed.adjustmentPercent
@@ -513,26 +517,29 @@ fun CreationScreen(
                 scope.launch { AppStateStore.save(context, creationState.toAppState()) }
             },
             onAddModule = {
-                modulePickerFor = pressed to pressedKind
+                modulePickerFor = Triple(pressed, pressedKind, scopeRoot)
                 entityAction = null
             },
             onDismiss = { entityAction = null }
         )
     }
 
-    modulePickerFor?.let { (pressed, pressedKind) ->
+    modulePickerFor?.let { picker ->
         ModulePickerDialog(
             modules = creationState.modules.toList(),
             onPick = { module ->
                 attachingModule = module
-                attachTarget = pressed to pressedKind
+                attachTarget = Triple(picker.first, picker.second, picker.third)
                 modulePickerFor = null
             },
             onDismiss = { modulePickerFor = null }
         )
     }
 
-    attachTarget?.let { (pressed, pressedKind) ->
+    attachTarget?.let { target ->
+        val pressed = target.first
+        val pressedKind = target.second
+        val scopeRoot = target.third
         val program = programOf(creationState, pressed)
         val targetKind = moduleTargetKindOf(pressedKind)
         val module = attachingModule
@@ -559,8 +566,8 @@ fun CreationScreen(
             )
         }
         if (program != null && targetKind != null && module != null) {
-            val candidates = remember(program.id, creationState.dataVersion.value) {
-                entitiesOfProgram(creationState, program)
+            val candidates = remember(scopeRoot.id, creationState.dataVersion.value) {
+                entitiesInSubtree(creationState, scopeRoot)
             }
             // Default input: the entity above the target, or the target itself when it's the root.
             val defaultInputId = parentOf(creationState, pressed)?.id ?: pressed.id

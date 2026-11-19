@@ -98,6 +98,74 @@ fun parentOf(creationState: CreationState, entity: BaseEntity): BaseEntity? = wh
     else -> null
 }
 
+/**
+ * Everything an entity contains, itself included — the scope an input may be read from. The section
+ * you add the module from decides which entity is passed here: a block row in the Block section, the
+ * program row in the Program section.
+ */
+fun entitiesInSubtree(
+    creationState: CreationState,
+    root: BaseEntity
+): List<Triple<Long, EntityKind, String>> {
+    val out = mutableListOf<Triple<Long, EntityKind, String>>()
+
+    fun add(id: Long, kind: EntityKind, name: String) {
+        out += Triple(id, kind, name)
+    }
+
+    fun walkSession(sessionId: Long) {
+        val session = creationState.sessions.find { it.id == sessionId } ?: return
+        add(session.id, EntityKind.SESSION, session.name)
+        session.exerciseIds.forEach { exId ->
+            creationState.exercises.find { it.id == exId }?.let { ex ->
+                val movement = creationState.movements.find { it.id == ex.movementId }?.name ?: ""
+                add(ex.id, EntityKind.EXERCISE, if (ex.name.isBlank()) movement else "$movement ${ex.name}")
+            }
+        }
+    }
+
+    fun walkDay(dayId: Long) {
+        val day = creationState.days.find { it.id == dayId } ?: return
+        add(day.id, EntityKind.DAY, day.name)
+        day.timedSessionIds.forEach { ts ->
+            creationState.timedSessions.find { it.id == ts }?.let { walkSession(it.sessionId) }
+        }
+    }
+
+    fun walkWeek(weekId: Long) {
+        val week = creationState.weeks.find { it.id == weekId } ?: return
+        add(week.id, EntityKind.WEEK, week.name)
+        week.dayIds.forEach { walkDay(it) }
+    }
+
+    fun walkBlock(blockId: Long) {
+        val block = creationState.blocks.find { it.id == blockId } ?: return
+        add(block.id, EntityKind.BLOCK, block.name)
+        block.subBlockIds.forEach { walkBlock(it) }
+        block.weekIds.forEach { walkWeek(it) }
+    }
+
+    when (root) {
+        is ProgramEntity -> {
+            add(root.id, EntityKind.PROGRAM, root.name)
+            root.blockIds.forEach { blockId ->
+                if (creationState.blocks.any { it.id == blockId }) walkBlock(blockId)
+                else walkWeek(blockId)
+            }
+        }
+        is BlockEntity -> walkBlock(root.id)
+        is WeekEntity -> walkWeek(root.id)
+        is DayEntity -> walkDay(root.id)
+        is SessionEntity -> walkSession(root.id)
+        is ExerciseEntity -> {
+            val movement = creationState.movements.find { it.id == root.movementId }?.name ?: ""
+            add(root.id, EntityKind.EXERCISE, if (root.name.isBlank()) movement else "$movement ${root.name}")
+        }
+        else -> Unit
+    }
+    return out.distinctBy { it.first }
+}
+
 /** Every entity of a program, with the label shown in the input picker. */
 fun entitiesOfProgram(
     creationState: CreationState,
