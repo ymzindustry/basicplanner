@@ -310,6 +310,17 @@ fun CreationScreen(
                                     entityAction = pressed to pressedKind
                                 }
                             },
+                            onAddAdjustment = {
+                                if (!tutorialActive) {
+                                    editingEntity = entity
+                                    showDialog = true
+                                }
+                            },
+                            onAddModule = {
+                                if (!tutorialActive) {
+                                    modulePickerFor = entity to currentKind
+                                }
+                            },
                             onEdit = { entityToEdit ->
                                 if (!tutorialActive) {
                                     editingEntity = entityToEdit

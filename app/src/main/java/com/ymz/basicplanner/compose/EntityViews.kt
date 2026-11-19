@@ -75,6 +75,9 @@ fun EntityRow(
     onCopy: () -> Unit,
     onDelete: () -> Unit,
     onLongPress: ((BaseEntity, EntityKind) -> Unit)? = null,
+    /** Fallback entries in the ⋯ menu, for devices where the long press is swallowed. */
+    onAddModule: (() -> Unit)? = null,
+    onAddAdjustment: (() -> Unit)? = null,
     enabled: Boolean = true
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -192,6 +195,24 @@ fun EntityRow(
                                 onEdit(entity)
                             }
                         )
+                        if (onAddAdjustment != null) {
+                            DropdownMenuItem(
+                                text = { Text("Add adjustment") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onAddAdjustment()
+                                }
+                            )
+                        }
+                        if (onAddModule != null) {
+                            DropdownMenuItem(
+                                text = { Text("Add module") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onAddModule()
+                                }
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.action_copy)) },
                             onClick = {
