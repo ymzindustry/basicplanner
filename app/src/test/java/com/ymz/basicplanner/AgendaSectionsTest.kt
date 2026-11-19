@@ -71,6 +71,35 @@ class AgendaSectionsTest {
     }
 
     @Test
+    fun a_missing_level_is_a_gap_not_a_fallback() {
+        val creationState = CreationState()
+        creationState.weeks.add(WeekEntity(id = 1L, name = "W1"))
+        creationState.weeks.add(WeekEntity(id = 2L, name = "W2"))
+        // Week 1 sits directly in the program (no block at all), week 2 under Block A / Sub B
+        creationState.blocks.add(
+            BlockEntity(id = 11L, name = "Sub B", weekIds = mutableListOf(2L))
+        )
+        creationState.blocks.add(
+            BlockEntity(id = 10L, name = "Block A", subBlockIds = mutableListOf(11L))
+        )
+        creationState.programs.add(ProgramEntity(id = 40L, name = "P", blockIds = mutableListOf(1L, 10L)))
+
+        val sections = buildProgramSections(
+            creationState.programs.first(),
+            LocalDate.of(2026, 11, 2),
+            creationState
+        )
+
+        // Level 0 for week 1: nothing, because it has no block — the agenda draws a gap.
+        assertEquals(emptyList<BlockEntity>(), sections[LocalDate.of(2026, 11, 2)]?.blockChain)
+        // Level 1 for that same week is also empty: still a gap.
+        assertEquals(null, sections[LocalDate.of(2026, 11, 2)]?.blockChain?.getOrNull(1))
+        // Week 2 has a full chain: Block A at level 0, Sub B at level 1.
+        assertEquals("Block A", sections[LocalDate.of(2026, 11, 9)]?.blockChain?.getOrNull(0)?.name)
+        assertEquals("Sub B", sections[LocalDate.of(2026, 11, 9)]?.blockChain?.getOrNull(1)?.name)
+    }
+
+    @Test
     fun a_program_without_blocks_still_yields_week_sections() {
         val creationState = CreationState()
         creationState.weeks.add(WeekEntity(id = 1L, name = "W1"))

@@ -553,19 +553,40 @@ fun ProgramAgendaScreen(
 
                     val sections = agendaSections
 
-                    val blockIndicators = remember(sections, visibleDates, blockLevel) {
-                        (0 until 6).mapNotNull { row ->
-                            val datesInRow = (0..6).map { visibleDates[row * 7 + it] }
-                            val section = datesInRow.firstNotNullOfOrNull { sections[it] } ?: return@mapNotNull null
-                            val block = section.blockChain.getOrNull(blockLevel) ?: return@mapNotNull null
-                            row to block
-                        }.toMap()
-                    }
+                    // A band belongs to the row where its week (or block) *starts*; a row that
+                    // continues the previous week shows nothing. Levels that don't exist for a
+                    // given week are left empty on purpose — gaps are legal.
+                    fun sectionOf(date: java.time.LocalDate) = sections[date]
+
                     val weekIndicators = remember(sections, visibleDates) {
                         (0 until 6).mapNotNull { row ->
-                            val datesInRow = (0..6).map { visibleDates[row * 7 + it] }
-                            val section = datesInRow.firstNotNullOfOrNull { sections[it] } ?: return@mapNotNull null
-                            row to section.week
+                            val dates = (0..6).map { visibleDates[row * 7 + it] }
+                            val startIndex = dates.indexOfFirst { date ->
+                                val here = sectionOf(date) ?: return@indexOfFirst false
+                                val before = sectionOf(date.minusDays(1))
+                                before?.week?.id != here.week.id
+                            }
+                            val index = if (startIndex >= 0) startIndex else if (row == 0) 0 else -1
+                            if (index < 0) null else sectionOf(dates[index])?.week?.let { row to it }
+                        }.toMap()
+                    }
+
+                    val blockIndicators = remember(sections, visibleDates, blockLevel) {
+                        (0 until 6).mapNotNull { row ->
+                            val dates = (0..6).map { visibleDates[row * 7 + it] }
+                            val startIndex = dates.indexOfFirst { date ->
+                                val here = sectionOf(date)?.blockChain?.getOrNull(blockLevel)
+                                    ?: return@indexOfFirst false
+                                val before = sectionOf(date.minusDays(1))?.blockChain?.getOrNull(blockLevel)
+                                before?.id != here.id
+                            }
+                            if (startIndex < 0) {
+                                // Row 0 may open in the middle of a block: label it once.
+                                if (row != 0) return@mapNotNull null
+                                val first = dates.firstNotNullOfOrNull { sectionOf(it)?.blockChain?.getOrNull(blockLevel) }
+                                return@mapNotNull first?.let { row to it }
+                            }
+                            sectionOf(dates[startIndex])?.blockChain?.getOrNull(blockLevel)?.let { row to it }
                         }.toMap()
                     }
 
