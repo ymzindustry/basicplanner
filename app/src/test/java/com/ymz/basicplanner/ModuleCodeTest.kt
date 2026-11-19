@@ -19,6 +19,13 @@ class ModuleCodeTest {
     }
 
     @Test
+    fun old_templates_are_recognised_and_new_ones_are_not() {
+        val legacy = "def test(max: int):\n    if max >= 8:\n        return -1, -1, -10.0, 60\n    return 0, 0, 0.0, 0\n"
+        assertTrue(ModuleDefinition.isLegacyTemplate(legacy))
+        assertTrue(!ModuleDefinition.isLegacyTemplate(ModuleDefinition.defaultCodeFor("test", "max", ItemType.INT)))
+    }
+
+    @Test
     fun the_signature_carries_the_parameter_type() {
         assertEquals("def test(max: int):", ModuleDefinition.signature("test", "max", ItemType.INT))
         assertEquals("def test(sleep: float):", ModuleDefinition.signature("test", "sleep", ItemType.FLOAT))

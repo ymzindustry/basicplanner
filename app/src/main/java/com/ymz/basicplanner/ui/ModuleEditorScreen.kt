@@ -115,6 +115,22 @@ fun ModuleEditorScreen(
     val signature = ModuleDefinition.signature(module.name, module.itemName, family?.itemType)
     var body by remember(moduleId) { mutableStateOf(moduleFunctionBody(module.code)) }
 
+    // Modules written before the deltas were declared get the explicit body once, on open.
+    androidx.compose.runtime.LaunchedEffect(moduleId) {
+        if (readOnly) return@LaunchedEffect
+        if (ModuleDefinition.isLegacyTemplate(module.code)) {
+            val upgraded = signature + "\n" +
+                ModuleDefinition.defaultCodeFor(module.name, module.itemName, family?.itemType)
+                    .lines().drop(1).joinToString("\n")
+            body = moduleFunctionBody(upgraded)
+            val index = creationState.modules.indexOfFirst { it.id == moduleId }
+            if (index >= 0) {
+                creationState.modules[index] = creationState.modules[index].copy(code = upgraded)
+                AppStateStore.save(context, creationState.toAppState())
+            }
+        }
+    }
+
     fun save() {
         val index = creationState.modules.indexOfFirst { it.id == moduleId }
         if (index < 0) return

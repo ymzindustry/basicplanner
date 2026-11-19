@@ -103,14 +103,32 @@ data class ModuleDefinition(
 
         const val DEFAULT_CODE: String =
             "def apply(item):\n" +
-                "    # item: the value of the item you picked, already typed\n" +
-                "    # return sets, reps, percent, time — deltas added to the plan\n" +
-                "    # everything starts at zero, so 0 means \"no change\"\n" +
-                "    if item >= 8:\n" +
-                "        # drained: one set less, one rep less, 10% lighter, +60 s rest\n" +
-                "        return -1, -1, -10.0, 60\n" +
+                "    # deltas, starting at zero\n" +
+                "    sets = 0\n" +
+                "    reps = 0\n" +
+                "    percent = 0.0\n" +
+                "    time = 0\n" +
                 "\n" +
-                "    return 0, 0, 0.0, 0\n"
+                "    if item >= 8:\n" +
+                "        # drained: lighter session\n" +
+                "        sets = -1\n" +
+                "        reps = -1\n" +
+                "        percent = -10.0\n" +
+                "        time = 60\n" +
+                "\n" +
+                "    return sets, reps, percent, time\n"
+
+        /**
+         * True for the bodies written before the four deltas were declared: they returned bare
+         * numbers, so `sets`, `reps`, `percent` and `time` never appeared in the file.
+         */
+        fun isLegacyTemplate(code: String): Boolean {
+            val declares = listOf("sets =", "reps =", "percent =", "time =").all { it in code }
+            if (declares) return false
+            return "return -1, -1, -10.0, 60" in code ||
+                "return 0, 0, 0.0, 0" in code ||
+                "\"sets\":" in code
+        }
 
         /** What `apply` returns, in order. */
         const val RETURN_KEYS = "sets, reps, percent, time"
