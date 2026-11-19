@@ -160,6 +160,13 @@ fun ModulesScreen(
                         .weight(1f)
                         .padding(start = 16.dp)
                 )
+                Text(
+                    text = appVersionLabel(),
+                    color = TextMuted.copy(alpha = 0.6f),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
             }
 
             if (creationState.modules.isEmpty()) {
@@ -288,6 +295,17 @@ fun ModulesScreen(
                 TextButton(onClick = { deleting = null }) { Text("Cancel", color = TextMuted) }
             }
         )
+    }
+}
+
+/** The installed build, read from the package so it can never lie. */
+@Composable
+private fun appVersionLabel(): String {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
+        }.getOrDefault("")
     }
 }
 

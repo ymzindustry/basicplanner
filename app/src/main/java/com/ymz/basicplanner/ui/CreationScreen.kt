@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -93,6 +95,7 @@ fun CreationScreen(
     var modulePickerFor by remember { mutableStateOf<Pair<BaseEntity, EntityKind>?>(null) }
     var attachTarget by remember { mutableStateOf<Pair<BaseEntity, EntityKind>?>(null) }
     var attachingModule by remember { mutableStateOf<com.ymz.basicplanner.model.module.ModuleDefinition?>(null) }
+    var attachError by remember { mutableStateOf<String?>(null) }
     var editingEntity by remember { mutableStateOf<BaseEntity?>(null) }
     var infoKind by remember { mutableStateOf<EntityKind?>(null) }
     var infoEntity by remember { mutableStateOf<BaseEntity?>(null) }
@@ -522,6 +525,28 @@ fun CreationScreen(
         val program = programOf(creationState, pressed)
         val targetKind = moduleTargetKindOf(pressedKind)
         val module = attachingModule
+        if (program == null || targetKind == null) {
+            AlertDialog(
+                onDismissRequest = {
+                    attachTarget = null
+                    attachingModule = null
+                },
+                containerColor = DarkSurfaceAlt,
+                confirmButton = {
+                    TextButton(onClick = {
+                        attachTarget = null
+                        attachingModule = null
+                    }) { Text("OK", color = AccentOrange, fontWeight = FontWeight.Bold) }
+                },
+                title = { Text("Cannot attach here", color = TextPrimary) },
+                text = {
+                    Text(
+                        "This entity is not inside a program yet. Put it under a block of a program first.",
+                        color = TextMuted
+                    )
+                }
+            )
+        }
         if (program != null && targetKind != null && module != null) {
             val candidates = remember(program.id, creationState.dataVersion.value) {
                 entitiesOfProgram(creationState, program)
