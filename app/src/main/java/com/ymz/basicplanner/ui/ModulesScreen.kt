@@ -696,7 +696,7 @@ private fun ModuleFormDialog(
         },
         title = {
             Text(
-                text = if (editing == null) "Create" else "Edit",
+                text = if (editing == null) "New module" else "Edit",
                 color = TextPrimary
             )
         },
@@ -706,7 +706,7 @@ private fun ModuleFormDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") },
-                    placeholder = { Text("test", color = TextMuted) },
+                    placeholder = { Text("Deadlift form", color = TextMuted) },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -722,6 +722,9 @@ private fun ModuleFormDialog(
                 )
 
                 Spacer(Modifier.height(16.dp))
+
+                Text(text = "Inputs", color = TextMuted, fontSize = 11.sp)
+                Spacer(Modifier.height(8.dp))
 
                 // Items, in the coloured bubbles used everywhere else in the app.
                 if (selectable.isEmpty()) {
