@@ -359,13 +359,6 @@ private fun ModuleCard(
                     onDismissRequest = { menuOpen = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Edit code") },
-                        onClick = {
-                            menuOpen = false
-                            onEditCode()
-                        }
-                    )
-                    DropdownMenuItem(
                         text = { Text("Edit") },
                         onClick = {
                             menuOpen = false
@@ -404,6 +397,7 @@ private fun ModuleCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable(onClick = onEditCode)
                     .heightIn(max = 260.dp)
                     .verticalScroll(rememberScrollState())
                     .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 12.dp)
