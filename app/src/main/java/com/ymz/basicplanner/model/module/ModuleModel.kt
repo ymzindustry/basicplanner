@@ -60,14 +60,14 @@ data class ModuleDefinition(
         fun defaultCodeFor(moduleName: String, itemName: String, itemType: ItemType? = null): String {
             val param = pythonParameterName(itemName)
             return signature(moduleName, itemName, itemType) + "\n" +
-                "    # the four values to adjust, all starting at zero\n" +
+                "    # deltas, starting at zero\n" +
                 "    sets = 0\n" +
                 "    reps = 0\n" +
                 "    percent = 0.0\n" +
                 "    time = 0\n" +
                 "\n" +
                 "    if $param >= 8:\n" +
-                "        # drained: one set less, one rep less, 10% lighter, +60 s rest\n" +
+                "        # drained: lighter session\n" +
                 "        sets = -1\n" +
                 "        reps = -1\n" +
                 "        percent = -10.0\n" +
