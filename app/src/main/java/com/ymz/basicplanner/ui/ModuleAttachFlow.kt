@@ -187,36 +187,23 @@ fun entitiesOfProgram(
 // ---------------------------------------------------------------- dialogs
 
 /**
- * What can be hung on an entity, in one dialog: its adjustment (typed here, zero by default) and
- * the modules already attached, with a way to add another.
+ * The long-press dialog: the modules already attached to this entity, and the way to add another.
+ * Adjustments are not here — they live in the entity's own edit dialog.
  */
 @Composable
 fun EntityActionDialog(
     entityLabel: String,
     kindLabel: String,
-    adjustment: Int,
     modules: List<ModuleDefinition>,
-    onAdjustmentChange: (Int) -> Unit,
     onAddModule: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var value by remember { mutableStateOf(adjustment.toString()) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(),
         containerColor = DarkSurfaceAlt,
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                onAdjustmentChange(value.toIntOrNull() ?: 0)
-                onDismiss()
-            }) {
-                Text("OK", color = AccentOrange, fontWeight = FontWeight.Bold)
-            }
-        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } },
         title = {
             Column {
                 Text("Add module", color = TextPrimary, fontWeight = FontWeight.Bold)
@@ -225,56 +212,8 @@ fun EntityActionDialog(
         },
         text = {
             Column {
-                Text("ADJUSTMENT", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(DarkSurface)
-                            .padding(horizontal = 12.dp, vertical = 10.dp)
-                    ) {
-                        BasicTextField(
-                            value = value,
-                            onValueChange = { text ->
-                                if (text.isEmpty() || text.matches(Regex("-?\\d{0,3}"))) value = text
-                            },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            textStyle = TextStyle(
-                                color = TextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            cursorBrush = SolidColor(AccentOrange),
-                            decorationBox = { inner ->
-                                Box {
-                                    if (value.isEmpty()) {
-                                        Text("0", color = TextMuted.copy(alpha = 0.5f), fontSize = 15.sp)
-                                    }
-                                    inner()
-                                }
-                            }
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text("%", color = TextMuted, fontSize = 14.sp)
-                }
-
-                Spacer(Modifier.height(18.dp))
-                Text("MODULES", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-
-                modules.forEach { module ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(DarkSurface)
-                            .padding(horizontal = 12.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                if (modules.isNotEmpty()) {
+                    modules.forEach { module ->
                         Text(
                             text = highlightPython(
                                 "def " + ModuleDefinition.pythonFunctionName(module.name) +
@@ -283,12 +222,12 @@ fun EntityActionDialog(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 12.sp,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                     }
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(6.dp))
                 }
-
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

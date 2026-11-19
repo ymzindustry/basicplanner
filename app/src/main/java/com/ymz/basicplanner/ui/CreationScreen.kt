@@ -494,14 +494,6 @@ fun CreationScreen(
         val pressedKind = action.second
         val scopeRoot = action.third
         val kind = moduleTargetKindOf(pressedKind)
-        val adjustment = when (pressed) {
-            is com.ymz.basicplanner.model.SessionEntity -> pressed.adjustmentPercent
-            is com.ymz.basicplanner.model.DayEntity -> pressed.adjustmentPercent
-            is com.ymz.basicplanner.model.WeekEntity -> pressed.adjustmentPercent
-            is com.ymz.basicplanner.model.BlockEntity -> pressed.adjustmentPercent
-            is com.ymz.basicplanner.model.ProgramEntity -> pressed.adjustmentPercent
-            else -> 0
-        }
         val attached = if (kind == null) emptyList() else creationState.moduleAttachments
             .filter { it.targetKind == kind && it.targetId == pressed.id }
             .mapNotNull { attachment -> creationState.modules.find { it.id == attachment.moduleId } }
@@ -509,19 +501,7 @@ fun CreationScreen(
         EntityActionDialog(
             entityLabel = pressed.name.ifBlank { pressedKind.moduleLabel() },
             kindLabel = pressedKind.moduleLabel(),
-            adjustment = adjustment,
             modules = attached,
-            onAdjustmentChange = { value ->
-                when (pressed) {
-                    is com.ymz.basicplanner.model.SessionEntity -> pressed.adjustmentPercent = value
-                    is com.ymz.basicplanner.model.DayEntity -> pressed.adjustmentPercent = value
-                    is com.ymz.basicplanner.model.WeekEntity -> pressed.adjustmentPercent = value
-                    is com.ymz.basicplanner.model.BlockEntity -> pressed.adjustmentPercent = value
-                    is com.ymz.basicplanner.model.ProgramEntity -> pressed.adjustmentPercent = value
-                    else -> {}
-                }
-                scope.launch { AppStateStore.save(context, creationState.toAppState()) }
-            },
             onAddModule = {
                 modulePickerFor = Triple(pressed, pressedKind, scopeRoot)
                 entityAction = null
