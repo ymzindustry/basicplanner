@@ -17,8 +17,8 @@ android {
         applicationId = "com.ymz.basicplanner.v10"
         minSdk = 26
         targetSdk = 36
-        versionCode = 57
-        versionName = "1.1.33"
+        versionCode = 58
+        versionName = "1.1.34"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

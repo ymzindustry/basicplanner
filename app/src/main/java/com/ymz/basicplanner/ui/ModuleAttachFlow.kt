@@ -16,6 +16,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowRight
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,29 +81,72 @@ fun EntityKind.moduleLabel(): String = when (this) {
     else -> name.lowercase()
 }
 
+fun kindOfEntity(entity: BaseEntity): EntityKind? = when (entity) {
+    is com.ymz.basicplanner.model.MovementEntity -> EntityKind.MOVEMENT
+    is ExerciseEntity -> EntityKind.EXERCISE
+    is SessionEntity -> EntityKind.SESSION
+    is DayEntity -> EntityKind.DAY
+    is WeekEntity -> EntityKind.WEEK
+    is BlockEntity -> EntityKind.BLOCK
+    is ProgramEntity -> EntityKind.PROGRAM
+    else -> null
+}
+
+/**
+ * A day's children are timed sessions, which wrap the session without being one. The tree shows the
+ * session, so the walks here do the same.
+ */
+private fun childrenAsEntities(
+    creationState: CreationState,
+    entity: BaseEntity,
+    kind: EntityKind
+): List<Pair<BaseEntity, EntityKind>> {
+    if (kind == EntityKind.EXERCISE) return emptyList()
+    return creationState.childrenOf(kind, entity).mapNotNull { child ->
+        when (child) {
+            is com.ymz.basicplanner.model.TimedSessionEntity ->
+                creationState.sessions.find { it.id == child.sessionId }?.let { it to EntityKind.SESSION }
+            else -> kindOfEntity(child)?.let { child to it }
+        }
+    }
+}
+
+/**
+ * Parent of every entity, built the same way the tree draws itself: `childrenOf` knows that a week
+ * slot may hold a day, a session or a single exercise, so a session dropped straight into a week
+ * still finds that week as its parent.
+ */
+private fun parentMap(creationState: CreationState): Map<Long, BaseEntity> {
+    val parents = mutableMapOf<Long, BaseEntity>()
+    fun walk(entity: BaseEntity, kind: EntityKind) {
+        childrenAsEntities(creationState, entity, kind).forEach { (child, childKind) ->
+            if (child.id <= 0 || child.id in parents) return@forEach
+            parents[child.id] = entity
+            walk(child, childKind)
+        }
+    }
+    creationState.programs.forEach { walk(it, EntityKind.PROGRAM) }
+    return parents
+}
+
 /** The program an entity lives in; a program is its own program. */
 fun programOf(creationState: CreationState, entity: BaseEntity): ProgramEntity? {
     if (entity is ProgramEntity) return entity
-    var current: BaseEntity = entity
-    repeat(8) {
-        current = parentOf(creationState, current) ?: return@repeat
-        if (current is ProgramEntity) return current
+    val parents = parentMap(creationState)
+    var current: BaseEntity? = parents[entity.id]
+    repeat(12) {
+        when (val node = current) {
+            null -> return null
+            is ProgramEntity -> return node
+            else -> current = parents[node.id]
+        }
     }
     return null
 }
 
 /** The entity directly above [entity], if the tree has one. */
-fun parentOf(creationState: CreationState, entity: BaseEntity): BaseEntity? = when (entity) {
-    is ExerciseEntity -> creationState.sessions.find { entity.id in it.exerciseIds }
-    is SessionEntity -> creationState.days.find { day ->
-        day.timedSessionIds.any { ts -> creationState.timedSessions.find { it.id == ts }?.sessionId == entity.id }
-    }
-    is DayEntity -> creationState.weeks.find { entity.id in it.dayIds }
-    is WeekEntity -> creationState.blocks.find { entity.id in it.weekIds }
-    is BlockEntity -> creationState.blocks.find { entity.id in it.subBlockIds }
-        ?: creationState.programs.find { entity.id in it.blockIds }
-    else -> null
-}
+fun parentOf(creationState: CreationState, entity: BaseEntity): BaseEntity? =
+    parentMap(creationState)[entity.id]
 
 /**
  * Everything an entity contains, itself included — the scope an input may be read from. The section
@@ -109,93 +159,30 @@ fun entitiesInSubtree(
 ): List<Triple<Long, EntityKind, String>> {
     val out = mutableListOf<Triple<Long, EntityKind, String>>()
 
-    fun add(id: Long, kind: EntityKind, name: String) {
-        out += Triple(id, kind, name)
-    }
-
-    fun walkSession(sessionId: Long) {
-        val session = creationState.sessions.find { it.id == sessionId } ?: return
-        add(session.id, EntityKind.SESSION, session.name)
-        session.exerciseIds.forEach { exId ->
-            creationState.exercises.find { it.id == exId }?.let { ex ->
-                val movement = creationState.movements.find { it.id == ex.movementId }?.name ?: ""
-                add(ex.id, EntityKind.EXERCISE, if (ex.name.isBlank()) movement else "$movement ${ex.name}")
-            }
-        }
-    }
-
-    fun walkDay(dayId: Long) {
-        val day = creationState.days.find { it.id == dayId } ?: return
-        add(day.id, EntityKind.DAY, day.name)
-        day.timedSessionIds.forEach { ts ->
-            creationState.timedSessions.find { it.id == ts }?.let { walkSession(it.sessionId) }
-        }
-    }
-
-    fun walkWeek(weekId: Long) {
-        val week = creationState.weeks.find { it.id == weekId } ?: return
-        add(week.id, EntityKind.WEEK, week.name)
-        week.dayIds.forEach { walkDay(it) }
-    }
-
-    fun walkBlock(blockId: Long) {
-        val block = creationState.blocks.find { it.id == blockId } ?: return
-        add(block.id, EntityKind.BLOCK, block.name)
-        block.subBlockIds.forEach { walkBlock(it) }
-        block.weekIds.forEach { walkWeek(it) }
-    }
-
-    when (root) {
-        is ProgramEntity -> {
-            add(root.id, EntityKind.PROGRAM, root.name)
-            root.blockIds.forEach { blockId ->
-                if (creationState.blocks.any { it.id == blockId }) walkBlock(blockId)
-                else walkWeek(blockId)
-            }
-        }
-        is BlockEntity -> walkBlock(root.id)
-        is WeekEntity -> walkWeek(root.id)
-        is DayEntity -> walkDay(root.id)
-        is SessionEntity -> walkSession(root.id)
+    fun label(entity: BaseEntity, kind: EntityKind): String = when (entity) {
         is ExerciseEntity -> {
-            val movement = creationState.movements.find { it.id == root.movementId }?.name ?: ""
-            add(root.id, EntityKind.EXERCISE, if (root.name.isBlank()) movement else "$movement ${root.name}")
+            val movement = creationState.movements.find { it.id == entity.movementId }?.name ?: ""
+            if (entity.name.isBlank()) movement else "$movement ${entity.name}"
         }
-        else -> Unit
+        else -> entity.name
     }
+
+    fun walk(entity: BaseEntity, kind: EntityKind) {
+        out += Triple(entity.id, kind, label(entity, kind))
+        childrenAsEntities(creationState, entity, kind).forEach { (child, childKind) ->
+            walk(child, childKind)
+        }
+    }
+
+    kindOfEntity(root)?.let { walk(root, it) }
     return out.distinctBy { it.first }
 }
 
-/** Every entity of a program, with the label shown in the input picker. */
+/** Every entity of a program, with the label shown in the input picker. *//** Every entity of a program, with the label shown in the input picker. */
 fun entitiesOfProgram(
     creationState: CreationState,
     program: ProgramEntity
-): List<Triple<Long, EntityKind, String>> {
-    val out = mutableListOf<Triple<Long, EntityKind, String>>()
-    out += Triple(program.id, EntityKind.PROGRAM, program.name)
-
-    fun walkBlock(blockId: Long) {
-        val block = creationState.blocks.find { it.id == blockId } ?: return
-        out += Triple(block.id, EntityKind.BLOCK, block.name)
-        block.subBlockIds.forEach { walkBlock(it) }
-        block.weekIds.forEach { weekId ->
-            val week = creationState.weeks.find { it.id == weekId } ?: return@forEach
-            out += Triple(week.id, EntityKind.WEEK, week.name)
-            week.dayIds.forEach { dayId ->
-                val day = creationState.days.find { it.id == dayId } ?: return@forEach
-                out += Triple(day.id, EntityKind.DAY, day.name)
-                day.timedSessionIds.forEach { tsId ->
-                    val sessionId = creationState.timedSessions.find { it.id == tsId }?.sessionId
-                        ?: return@forEach
-                    val session = creationState.sessions.find { it.id == sessionId } ?: return@forEach
-                    out += Triple(session.id, EntityKind.SESSION, session.name)
-                }
-            }
-        }
-    }
-    program.blockIds.forEach { walkBlock(it) }
-    return out.distinctBy { it.first }
-}
+): List<Triple<Long, EntityKind, String>> = entitiesInSubtree(creationState, program)
 
 // ---------------------------------------------------------------- dialogs
 
@@ -386,17 +373,95 @@ fun ModulePickerDialog(
     )
 }
 
-/** Which entity feeds the module's item — restricted to the same program. */
+/**
+ * The input chooser, drawn like the creation tree: same rows, same chevrons, same nesting — tapping
+ * a row selects it instead of opening it for edition.
+ */
 @Composable
-fun InputEntityPickerDialog(
-    program: ProgramEntity,
-    candidates: List<Triple<Long, EntityKind, String>>,
+fun InputEntityTreeDialog(
+    creationState: CreationState,
+    scopeRoot: BaseEntity,
+    programName: String,
     initialId: Long?,
     onPick: (Long, String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var selected by remember { mutableStateOf(initialId) }
-    val selectedLabel = candidates.find { it.first == selected }?.third ?: ""
+    val expanded = remember { mutableStateMapOf<Long, Boolean>() }
+
+    fun label(entity: BaseEntity): String = when (entity) {
+        is ExerciseEntity -> {
+            val movement = creationState.movements.find { it.id == entity.movementId }?.name ?: ""
+            if (entity.name.isBlank()) movement else "$movement ${entity.name}"
+        }
+        else -> entity.name
+    }
+
+    @Composable
+    fun row(entity: BaseEntity, kind: EntityKind, depth: Int) {
+        val children = if (kind == EntityKind.EXERCISE) emptyList()
+        else creationState.childrenOf(kind, entity).filter { it.id > 0 }
+        val isOpen = expanded[entity.id] == true
+        val isSelected = entity.id == selected
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (isSelected) AccentOrange.copy(alpha = 0.16f) else Color.Transparent)
+                .clickable { selected = entity.id }
+                .padding(start = (depth * 14).dp, top = 7.dp, bottom = 7.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clickable(enabled = children.isNotEmpty()) {
+                        expanded[entity.id] = !isOpen
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (children.isNotEmpty()) {
+                    Icon(
+                        imageVector = if (isOpen) Icons.Default.ArrowDropDown
+                        else Icons.AutoMirrored.Filled.ArrowRight,
+                        contentDescription = null,
+                        tint = AccentOrange,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Text(
+                text = kind.moduleLabel(),
+                color = TextMuted,
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.width(46.dp)
+            )
+            Text(
+                text = label(entity),
+                color = if (isSelected) AccentOrange else TextPrimary,
+                fontSize = 13.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (isSelected) {
+                Box(
+                    Modifier
+                        .size(7.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(AccentOrange)
+                )
+            }
+        }
+        if (isOpen) {
+            children.forEach { child ->
+                kindOfEntity(child)?.let { childKind -> row(child, childKind, depth + 1) }
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -406,7 +471,14 @@ fun InputEntityPickerDialog(
         confirmButton = {
             TextButton(
                 enabled = selected != null,
-                onClick = { selected?.let { onPick(it, selectedLabel) } }
+                onClick = {
+                    val id = selected
+                    if (id != null) {
+                        val label = entitiesInSubtree(creationState, scopeRoot)
+                            .find { it.first == id }?.third ?: ""
+                        onPick(id, label)
+                    }
+                }
             ) {
                 Text(
                     "OK",
@@ -419,7 +491,7 @@ fun InputEntityPickerDialog(
         text = {
             Column {
                 Text(
-                    text = "Reads its item from this entity, in ${program.name}:",
+                    text = "Scoped to $programName — pick where the item is read.",
                     color = TextMuted,
                     fontSize = 11.sp
                 )
@@ -427,36 +499,12 @@ fun InputEntityPickerDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 360.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
                 ) {
-                    candidates.forEach { (id, kind, label) ->
-                        val isSelected = id == selected
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) AccentOrange.copy(alpha = 0.18f) else DarkSurface)
-                                .clickable { selected = id }
-                                .padding(horizontal = 12.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = kind.moduleLabel(),
-                                color = if (isSelected) AccentOrange else TextMuted,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.width(62.dp)
-                            )
-                            Text(
-                                text = label,
-                                color = if (isSelected) AccentOrange else TextPrimary,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                    kindOfEntity(scopeRoot)?.let { rootKind ->
+                        expanded[scopeRoot.id] = true
+                        row(scopeRoot, rootKind, 0)
                     }
                 }
             }

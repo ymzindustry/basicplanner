@@ -566,14 +566,12 @@ fun CreationScreen(
             )
         }
         if (program != null && targetKind != null && module != null) {
-            val candidates = remember(scopeRoot.id, creationState.dataVersion.value) {
-                entitiesInSubtree(creationState, scopeRoot)
-            }
             // Default input: the entity above the target, or the target itself when it's the root.
             val defaultInputId = parentOf(creationState, pressed)?.id ?: pressed.id
-            InputEntityPickerDialog(
-                program = program,
-                candidates = candidates,
+            InputEntityTreeDialog(
+                creationState = creationState,
+                scopeRoot = scopeRoot,
+                programName = program.name,
                 initialId = defaultInputId,
                 onPick = { inputId, inputLabel ->
                     creationState.moduleAttachments.add(
