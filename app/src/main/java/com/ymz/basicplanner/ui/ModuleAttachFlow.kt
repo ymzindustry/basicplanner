@@ -219,8 +219,8 @@ fun EntityActionDialog(
         },
         title = {
             Column {
-                Text(entityLabel, color = TextPrimary, fontWeight = FontWeight.Bold)
-                Text(kindLabel, color = TextMuted, fontSize = 11.sp)
+                Text("Add module", color = TextPrimary, fontWeight = FontWeight.Bold)
+                Text("$entityLabel · $kindLabel", color = TextMuted, fontSize = 11.sp)
             }
         },
         text = {
@@ -320,20 +320,31 @@ private fun ActionRow(label: String, onClick: () -> Unit) {
     }
 }
 
-/** Compact module chooser: one `def …(…)` line per module, same shape as the modules list. */
+/**
+ * Module chooser: bare `def …(…)` lines in the code colours, chevron to unfold the body — the same
+ * shape as the Modules tab, without filled cells.
+ */
 @Composable
 fun ModulePickerDialog(
+    entityLabel: String,
     modules: List<ModuleDefinition>,
     onPick: (ModuleDefinition) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var expandedId by remember { mutableStateOf<Long?>(null) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(),
         containerColor = DarkSurfaceAlt,
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } },
-        title = { Text("Add module", color = TextPrimary) },
+        title = {
+            Column {
+                Text("Add module", color = TextPrimary, fontWeight = FontWeight.Bold)
+                Text(entityLabel, color = TextMuted, fontSize = 11.sp)
+            }
+        },
         text = {
             if (modules.isEmpty()) {
                 Text("No module yet — create one from the Modules section.", color = TextMuted, fontSize = 12.sp)
@@ -341,30 +352,59 @@ fun ModulePickerDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 360.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
                 ) {
                     modules.forEach { module ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(DarkSurface)
-                                .clickable { onPick(module) }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = highlightPython(
-                                    "def " + ModuleDefinition.pythonFunctionName(module.name) +
-                                        "(" + ModuleDefinition.pythonParameterName(module.itemName) + "):"
-                                ),
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        val open = expandedId == module.id
+                        Column(Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onPick(module) }
+                                    .padding(horizontal = 2.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = highlightPython(
+                                        "def " + ModuleDefinition.pythonFunctionName(module.name) +
+                                            "(" + ModuleDefinition.pythonParameterName(module.itemName) + "):"
+                                    ),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = if (open) Icons.Default.ArrowDropDown
+                                    else Icons.AutoMirrored.Filled.ArrowRight,
+                                    contentDescription = null,
+                                    tint = TextMuted,
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .clickable { expandedId = if (open) null else module.id }
+                                )
+                            }
+                            if (open) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 10.dp, bottom = 8.dp)
+                                ) {
+                                    moduleFunctionBody(module.code).lines().forEach { line ->
+                                        Text(
+                                            text = highlightPython(line.ifEmpty { " " }),
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            lineHeight = 15.sp,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -510,6 +550,83 @@ fun InputEntityTreeDialog(
             }
         }
     )
+}
+
+/**
+ * The tree used to pick the input, drawn inline (not as a dialog) so the creation screen can dim
+ * everything around it and let the parent entity stand out.
+ */
+@Composable
+fun InputPickerTree(
+    creationState: CreationState,
+    scopeRoot: BaseEntity,
+    onSelect: (Long, String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val expanded = remember { mutableStateMapOf<Long, Boolean>() }
+    expanded[scopeRoot.id] = true
+
+    fun label(entity: BaseEntity): String = when (entity) {
+        is ExerciseEntity -> {
+            val movement = creationState.movements.find { it.id == entity.movementId }?.name ?: ""
+            if (entity.name.isBlank()) movement else "$movement ${entity.name}"
+        }
+        else -> entity.name
+    }
+
+    @Composable
+    fun row(entity: BaseEntity, kind: EntityKind, depth: Int) {
+        val children = childrenAsEntities(creationState, entity, kind)
+        val isOpen = expanded[entity.id] == true
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onSelect(entity.id, label(entity)) }
+                .padding(start = (depth * 14).dp, top = 8.dp, bottom = 8.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable(enabled = children.isNotEmpty()) { expanded[entity.id] = !isOpen },
+                contentAlignment = Alignment.Center
+            ) {
+                if (children.isNotEmpty()) {
+                    Icon(
+                        imageVector = if (isOpen) Icons.Default.ArrowDropDown
+                        else Icons.AutoMirrored.Filled.ArrowRight,
+                        contentDescription = null,
+                        tint = AccentOrange,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Text(
+                text = kind.moduleLabel(),
+                color = TextMuted,
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.width(48.dp)
+            )
+            Text(
+                text = label(entity),
+                color = TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        if (isOpen) {
+            children.forEach { (child, childKind) -> row(child, childKind, depth + 1) }
+        }
+    }
+
+    Column(modifier = modifier.verticalScroll(rememberScrollState())) {
+        kindOfEntity(scopeRoot)?.let { row(scopeRoot, it, 0) }
+    }
 }
 
 /** Builds the attachment once both choices are made. */
