@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Icon
@@ -88,6 +88,11 @@ fun CreationScreen(
     var dxAccum by remember { mutableFloatStateOf(0f) }
     val step = 60f
     var showDialog by remember { mutableStateOf(false) }
+    // Long-press flow: entity action → module picker → input entity → attachment.
+    var entityAction by remember { mutableStateOf<Pair<BaseEntity, EntityKind>?>(null) }
+    var modulePickerFor by remember { mutableStateOf<Pair<BaseEntity, EntityKind>?>(null) }
+    var attachTarget by remember { mutableStateOf<Pair<BaseEntity, EntityKind>?>(null) }
+    var attachingModule by remember { mutableStateOf<com.ymz.basicplanner.model.module.ModuleDefinition?>(null) }
     var editingEntity by remember { mutableStateOf<BaseEntity?>(null) }
     var infoKind by remember { mutableStateOf<EntityKind?>(null) }
     var infoEntity by remember { mutableStateOf<BaseEntity?>(null) }
@@ -184,7 +189,7 @@ fun CreationScreen(
                 rightButtons = {
                     IconButton(onClick = onOpenModules, enabled = !tutorialActive) {
                         Icon(
-                            imageVector = Icons.Default.Code,
+                            imageVector = Icons.Default.Extension,
                             contentDescription = "Modules",
                             tint = AccentOrange
                         )
@@ -300,6 +305,11 @@ fun CreationScreen(
                             composition = composition,
                             creationState = creationState,
                             enabled = !tutorialActive,
+                            onLongPress = { pressed, pressedKind ->
+                                if (!tutorialActive) {
+                                    entityAction = pressed to pressedKind
+                                }
+                            },
                             onEdit = { entityToEdit ->
                                 if (!tutorialActive) {
                                     editingEntity = entityToEdit
@@ -463,6 +473,73 @@ fun CreationScreen(
                     showDialog = true
                     infoKind = null
                     infoEntity = null
+                }
+            )
+        }
+    }
+
+    entityAction?.let { (pressed, pressedKind) ->
+        EntityActionDialog(
+            entityLabel = pressed.name.ifBlank { pressedKind.moduleLabel() },
+            kindLabel = pressedKind.moduleLabel(),
+            onAdjustment = {
+                editingEntity = pressed
+                showDialog = true
+                entityAction = null
+            },
+            onModule = {
+                modulePickerFor = pressed to pressedKind
+                entityAction = null
+            },
+            onDismiss = { entityAction = null }
+        )
+    }
+
+    modulePickerFor?.let { (pressed, pressedKind) ->
+        ModulePickerDialog(
+            modules = creationState.modules.toList(),
+            onPick = { module ->
+                attachingModule = module
+                attachTarget = pressed to pressedKind
+                modulePickerFor = null
+            },
+            onDismiss = { modulePickerFor = null }
+        )
+    }
+
+    attachTarget?.let { (pressed, pressedKind) ->
+        val program = programOf(creationState, pressed)
+        val targetKind = moduleTargetKindOf(pressedKind)
+        val module = attachingModule
+        if (program != null && targetKind != null && module != null) {
+            val candidates = remember(program.id, creationState.dataVersion.value) {
+                entitiesOfProgram(creationState, program)
+            }
+            // Default input: the entity above the target, or the target itself when it's the root.
+            val defaultInputId = parentOf(creationState, pressed)?.id ?: pressed.id
+            InputEntityPickerDialog(
+                program = program,
+                candidates = candidates,
+                initialId = defaultInputId,
+                onPick = { inputId, inputLabel ->
+                    creationState.moduleAttachments.add(
+                        buildModuleAttachment(
+                            id = creationState.newId(),
+                            module = module,
+                            program = program,
+                            targetKind = targetKind,
+                            targetId = pressed.id,
+                            inputEntityId = inputId,
+                            inputLabel = inputLabel
+                        )
+                    )
+                    scope.launch { AppStateStore.save(context, creationState.toAppState()) }
+                    attachTarget = null
+                    attachingModule = null
+                },
+                onDismiss = {
+                    attachTarget = null
+                    attachingModule = null
                 }
             )
         }

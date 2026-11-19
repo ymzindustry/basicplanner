@@ -80,6 +80,35 @@ fun moduleInputCandidates(app: AppState, kind: ModuleTargetKind, targetId: Long)
         }
         ModuleTargetKind.SESSION -> addSession(targetId)
         ModuleTargetKind.DAY -> addDay(targetId)
+        ModuleTargetKind.WEEK -> {
+            val week = app.weeks.find { it.id == targetId }
+            if (week != null) {
+                result += ModuleInputCandidate(week.id, "Week", week.name)
+                app.blocks.filter { week.id in it.weekIds }.forEach { block ->
+                    result += ModuleInputCandidate(block.id, "Block", block.name)
+                    app.programs.filter { p -> block.id in p.blockIds }.forEach {
+                        result += ModuleInputCandidate(it.id, "Program", it.name)
+                    }
+                }
+            }
+        }
+        ModuleTargetKind.BLOCK -> {
+            val block = app.blocks.find { it.id == targetId } ?: return result
+            result += ModuleInputCandidate(block.id, "Block", block.name)
+            block.weekIds.forEach { addDay(-1) }
+            app.programs.filter { p -> block.id in p.blockIds }.forEach {
+                result += ModuleInputCandidate(it.id, "Program", it.name)
+            }
+        }
+        ModuleTargetKind.PROGRAM -> {
+            val program = app.programs.find { it.id == targetId } ?: return result
+            result += ModuleInputCandidate(program.id, "Program", program.name)
+            program.blockIds.forEach { blockId ->
+                app.blocks.find { it.id == blockId }?.let { block ->
+                    result += ModuleInputCandidate(block.id, "Block", block.name)
+                }
+            }
+        }
     }
     return result.distinctBy { it.entityId }
 }
@@ -228,10 +257,13 @@ class ModuleEngine(private val executor: ModuleExecutor) {
     }
 
     private fun breadth(kind: ModuleTargetKind): Int = when (kind) {
-        ModuleTargetKind.DAY -> 0
-        ModuleTargetKind.SESSION -> 1
-        ModuleTargetKind.EXERCISE -> 2
-        ModuleTargetKind.SET -> 3
+        ModuleTargetKind.PROGRAM -> 0
+        ModuleTargetKind.BLOCK -> 1
+        ModuleTargetKind.WEEK -> 2
+        ModuleTargetKind.DAY -> 3
+        ModuleTargetKind.SESSION -> 4
+        ModuleTargetKind.EXERCISE -> 5
+        ModuleTargetKind.SET -> 6
     }
 
     /** The plan sets an attachment covers inside [sessionId]. */
@@ -239,14 +271,52 @@ class ModuleEngine(private val executor: ModuleExecutor) {
         val session = app.sessions.find { it.id == sessionId } ?: return emptyList()
         val sessionExercises = session.exerciseIds.mapNotNull { id -> app.exercises.find { it.id == id } }
 
+        val chain = ancestorsOf(app, sessionId)
+        val covers = when (attachment.targetKind) {
+            ModuleTargetKind.PROGRAM -> attachment.targetId in chain.getValue(ModuleTargetKind.PROGRAM)
+            ModuleTargetKind.BLOCK -> attachment.targetId in chain.getValue(ModuleTargetKind.BLOCK)
+            ModuleTargetKind.WEEK -> attachment.targetId in chain.getValue(ModuleTargetKind.WEEK)
+            ModuleTargetKind.DAY -> attachment.targetId in chain.getValue(ModuleTargetKind.DAY)
+            ModuleTargetKind.SESSION -> session.id == attachment.targetId
+            ModuleTargetKind.EXERCISE, ModuleTargetKind.SET -> true
+        }
+
         val exercises = when (attachment.targetKind) {
             ModuleTargetKind.SET -> sessionExercises.filter { ex -> ex.entries.any { it.id == attachment.targetId } }
             ModuleTargetKind.EXERCISE -> sessionExercises.filter { it.id == attachment.targetId }
-            ModuleTargetKind.SESSION -> if (session.id == attachment.targetId) sessionExercises else emptyList()
-            ModuleTargetKind.DAY -> if (dayOfSession(app, sessionId) == attachment.targetId) sessionExercises else emptyList()
+            else -> if (covers) sessionExercises else emptyList()
         }
         return exercises.flatMap { ex -> ex.entries.map { ex to it } }
             .filter { (_, entry) -> attachment.targetKind != ModuleTargetKind.SET || entry.id == attachment.targetId }
+    }
+
+    /**
+     * Every entity the session hangs from, by kind: its day(s), week(s), the whole block chain up to
+     * the program. A module attached to any of them reaches this session.
+     */
+    private fun ancestorsOf(app: AppState, sessionId: Long): Map<ModuleTargetKind, Set<Long>> {
+        val days = app.days.filter { day ->
+            day.timedSessionIds.any { ts -> app.timedSessions.any { it.id == ts && it.sessionId == sessionId } }
+        }
+        val weeks = app.weeks.filter { week -> days.any { it.id in week.dayIds } }
+        val blocks = mutableSetOf<Long>()
+        fun collectBlock(id: Long) {
+            if (!blocks.add(id)) return
+            app.blocks.find { it.id == id }?.subBlockIds?.forEach { collectBlock(it) }
+        }
+        app.blocks.filter { block -> weeks.any { it.id in block.weekIds } }.forEach { collectBlock(it.id) }
+        val programs = app.programs.filter { program ->
+            program.blockIds.any { it in blocks } || weeks.any { week -> week.id in program.blockIds }
+        }
+        return mapOf(
+            ModuleTargetKind.PROGRAM to programs.map { it.id }.toSet(),
+            ModuleTargetKind.BLOCK to blocks,
+            ModuleTargetKind.WEEK to weeks.map { it.id }.toSet(),
+            ModuleTargetKind.DAY to days.map { it.id }.toSet(),
+            ModuleTargetKind.SESSION to setOf(sessionId),
+            ModuleTargetKind.EXERCISE to emptySet(),
+            ModuleTargetKind.SET to emptySet()
+        )
     }
 
     /** The Day entity the session sits under, if any. */
@@ -337,6 +407,9 @@ class ModuleEngine(private val executor: ModuleExecutor) {
         ModuleTargetKind.EXERCISE -> app.exercises.find { it.id == attachment.targetId }?.name ?: ""
         ModuleTargetKind.SESSION -> app.sessions.find { it.id == attachment.targetId }?.name ?: ""
         ModuleTargetKind.DAY -> app.days.find { it.id == attachment.targetId }?.name ?: ""
+        ModuleTargetKind.WEEK -> app.weeks.find { it.id == attachment.targetId }?.name ?: ""
+        ModuleTargetKind.BLOCK -> app.blocks.find { it.id == attachment.targetId }?.name ?: ""
+        ModuleTargetKind.PROGRAM -> app.programs.find { it.id == attachment.targetId }?.name ?: ""
     }
 
     private fun plannedWeightKg(

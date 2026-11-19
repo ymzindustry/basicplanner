@@ -1,9 +1,11 @@
 package com.ymz.basicplanner.compose
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +64,7 @@ import com.ymz.basicplanner.ui.*
 import kotlin.math.ceil
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun EntityRow(
     entity: BaseEntity,
     kind: EntityKind,
@@ -71,6 +74,7 @@ fun EntityRow(
     onEdit: (BaseEntity) -> Unit,
     onCopy: () -> Unit,
     onDelete: () -> Unit,
+    onLongPress: ((BaseEntity, EntityKind) -> Unit)? = null,
     enabled: Boolean = true
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -97,7 +101,11 @@ fun EntityRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = enabled) { expanded = !expanded }
+                .combinedClickable(
+                    enabled = enabled,
+                    onClick = { expanded = !expanded },
+                    onLongClick = { onLongPress?.invoke(entity, kind) }
+                )
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween

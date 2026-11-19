@@ -297,7 +297,13 @@ private fun attachmentLabel(creationState: CreationState, attachment: ModuleAtta
         ModuleTargetKind.SESSION -> creationState.sessions.find { it.id == attachment.targetId }?.name
         ModuleTargetKind.EXERCISE -> creationState.exercises.find { it.id == attachment.targetId }?.name
         ModuleTargetKind.SET -> "set ${attachment.targetId}"
+        ModuleTargetKind.WEEK -> creationState.weeks.find { it.id == attachment.targetId }?.name
+        ModuleTargetKind.BLOCK -> creationState.blocks.find { it.id == attachment.targetId }?.name
+        ModuleTargetKind.PROGRAM -> creationState.programs.find { it.id == attachment.targetId }?.name
     } ?: when (attachment.targetKind) {
+        ModuleTargetKind.PROGRAM -> "Program (missing)"
+        ModuleTargetKind.BLOCK -> "Block (missing)"
+        ModuleTargetKind.WEEK -> "Week (missing)"
         ModuleTargetKind.DAY -> "Day (missing)"
         ModuleTargetKind.SESSION -> "Session (missing)"
         ModuleTargetKind.EXERCISE -> "Exercise (missing)"
@@ -896,6 +902,12 @@ private fun programTargets(
         }
         ModuleTargetKind.SET -> exercises.flatMap { ex ->
             ex.entries.mapIndexed { index, entry -> entry.id to "${ex.name.ifBlank { "set" }} · ${index + 1}" }
+        }
+        ModuleTargetKind.WEEK, ModuleTargetKind.BLOCK, ModuleTargetKind.PROGRAM -> {
+            val dayIds = sessions.flatMap { s ->
+                creationState.days.filter { day -> day.timedSessionIds.any { ts -> creationState.timedSessions.find { it.id == ts }?.sessionId == s.id } }
+            }.distinctBy { it.id }
+            dayIds.map { it.id to it.name }
         }
         ModuleTargetKind.DAY -> {
             val dayIds = sessions.flatMap { s ->

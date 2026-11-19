@@ -4,7 +4,7 @@ import com.ymz.basicplanner.model.ItemType
 import kotlinx.serialization.Serializable
 
 /** What a module can be attached to. */
-enum class ModuleTargetKind { DAY, SESSION, EXERCISE, SET }
+enum class ModuleTargetKind { PROGRAM, BLOCK, WEEK, DAY, SESSION, EXERCISE, SET }
 
 @Serializable
 data class ModuleInputSpec(

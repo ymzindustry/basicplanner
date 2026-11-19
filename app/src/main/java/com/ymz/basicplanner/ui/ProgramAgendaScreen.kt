@@ -292,16 +292,6 @@ fun ProgramAgendaScreen(
                         )
                     }
                     IconButton(
-                        onClick = onOpenModules,
-                        enabled = !isEditMode && !tutorialActive
-                    ) {
-                        Icon(
-                            Icons.Default.Extension,
-                            contentDescription = "modules",
-                            tint = if (!isEditMode) AccentOrange else TextMuted
-                        )
-                    }
-                    IconButton(
                         onClick = { showAdvancedSettings = true },
                         enabled = !isEditMode && !tutorialActive
                     )
@@ -490,27 +480,15 @@ fun ProgramAgendaScreen(
                                             )
                                         }
                                     }
-                                    DropdownMenu(
+                                    com.ymz.basicplanner.compose.UnifiedSelectionMenu(
                                         expanded = levelMenu,
-                                        onDismissRequest = { levelMenu = false },
-                                        modifier = Modifier.background(DarkSurfaceAlt)
-                                    ) {
-                                        (0 until maxBlockDepth).forEach { level ->
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        text = "Level $level",
-                                                        color = if (level == blockLevel) AccentOrange else TextPrimary,
-                                                        fontSize = 13.sp
-                                                    )
-                                                },
-                                                onClick = {
-                                                    blockLevel = level
-                                                    levelMenu = false
-                                                }
-                                            )
+                                        onDismiss = { levelMenu = false },
+                                        items = (0 until maxBlockDepth).map { "Level $it" },
+                                        selectedItem = "Level $blockLevel",
+                                        onItemClick = { label ->
+                                            blockLevel = label.substringAfter("Level ").toIntOrNull() ?: 0
                                         }
-                                    }
+                                    )
                                 }
                             }
                             ProgramSelector(
