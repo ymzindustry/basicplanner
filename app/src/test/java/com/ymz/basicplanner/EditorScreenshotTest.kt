@@ -44,7 +44,7 @@ class EditorScreenshotTest {
                 id = 1L,
                 name = "Deadlift form",
                 description = "Lowers reps when form is poor",
-                code = ModuleDefinition.defaultCodeFor("Deadlift form", "form"),
+                code = ModuleDefinition.defaultCodeFor("Deadlift form", "form", ItemType.INT),
                 itemFamilyId = 90L,
                 itemName = "form"
             )

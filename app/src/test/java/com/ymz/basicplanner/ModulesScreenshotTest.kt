@@ -40,7 +40,7 @@ class ModulesScreenshotTest {
                 id = 1L,
                 name = "Deadlift form",
                 description = "Lowers reps when form is poor",
-                code = ModuleDefinition.defaultCodeFor("Deadlift form", "form"),
+                code = ModuleDefinition.defaultCodeFor("Deadlift form", "form", ItemType.INT),
                 itemFamilyId = 90L,
                 itemName = "form"
             )
@@ -50,7 +50,7 @@ class ModulesScreenshotTest {
                 id = 2L,
                 name = "Deload week",
                 description = "Drops intensity on the last week",
-                code = ModuleDefinition.defaultCodeFor("Deload week", "week"),
+                code = ModuleDefinition.defaultCodeFor("Deload week", "week", ItemType.INT),
                 itemFamilyId = 90L,
                 itemName = "week"
             )

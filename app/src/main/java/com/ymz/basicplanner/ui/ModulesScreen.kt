@@ -58,7 +58,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
+import com.ymz.basicplanner.R
 import com.ymz.basicplanner.compose.CommonBottomBar
 import com.ymz.basicplanner.compose.CommonHeader
 import com.ymz.basicplanner.compose.MarqueeText
@@ -103,7 +105,7 @@ fun ModulesScreen(
     }
     var creating by remember { mutableStateOf(false) }
     var attachingTo by remember { mutableStateOf<ModuleDefinition?>(null) }
-    var changingInput by remember { mutableStateOf<ModuleDefinition?>(null) }
+    var editingModule by remember { mutableStateOf<ModuleDefinition?>(null) }
     var renaming by remember { mutableStateOf<ModuleDefinition?>(null) }
     var deleting by remember { mutableStateOf<ModuleDefinition?>(null) }
 
@@ -120,11 +122,12 @@ fun ModulesScreen(
                     IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "back", tint = AccentOrange)
                     }
+                },
+                rightButtons = {
                     IconButton(onClick = { creating = true }, modifier = Modifier.size(40.dp)) {
                         Icon(Icons.Default.Add, "new module", tint = AccentOrange)
                     }
-                },
-                rightButtons = {}
+                }
             )
         }
     ) { padding ->
@@ -177,12 +180,9 @@ fun ModulesScreen(
                                 val program = creationState.programs.find { it.id == attachment.programId }?.name
                                 listOfNotNull(program, target).joinToString(" · ")
                             },
-                            onEdit = {
-                                editingReadOnly = false
-                                editingModuleId = module.id
-                            },
-                            onChangeInput = { changingInput = module },
-                            onRename = { renaming = module },
+                            itemType = creationState.itemFamilies
+                                .find { it.id == module.itemFamilyId }?.itemType,
+                            onEdit = { editingModule = module },
                             onAttach = { attachingTo = module },
                             onDetach = { attachment ->
                                 creationState.moduleAttachments.remove(attachment)
@@ -198,72 +198,45 @@ fun ModulesScreen(
     }
 
     if (creating) {
-        NewModuleDialog(
+        ModuleFormDialog(
             creationState = creationState,
+            editing = null,
             onDismiss = { creating = false },
-            onCreate = { name, family ->
+            onSubmit = { name, family ->
                 val newModule = ModuleDefinition(
                     id = creationState.newId(),
                     name = name,
-                    code = ModuleDefinition.defaultCodeFor(name, family.name),
+                    code = ModuleDefinition.defaultCodeFor(name, family.name, family.itemType),
                     itemFamilyId = family.id,
                     itemName = family.name
                 )
                 creationState.modules.add(newModule)
-                scope.launch { AppStateStore.save(context, creationState.toAppState()) }
+                save()
                 creating = false
-                editingReadOnly = false
                 editingModuleId = newModule.id
             }
         )
     }
 
-    changingInput?.let { module ->
-        ChangeInputDialog(
+    editingModule?.let { module ->
+        ModuleFormDialog(
             creationState = creationState,
-            module = module,
-            onDismiss = { changingInput = null },
-            onPick = { family ->
+            editing = module,
+            onDismiss = { editingModule = null },
+            onSubmit = { name, family ->
                 val index = creationState.modules.indexOfFirst { it.id == module.id }
                 if (index >= 0) {
-                    val previous = ModuleDefinition.pythonParameterName(module.itemName)
-                    val next = ModuleDefinition.pythonParameterName(family.name)
-                    // Keep the prototype in step with the new input.
-                    val code = if (previous != next) {
-                        Regex("\\b" + Regex.escape(previous) + "\\b").replace(module.code, next)
-                    } else {
-                        module.code
-                    }
-                    creationState.modules[index] = creationState.modules[index].copy(
+                    // The signature follows the new name and input; the body is kept untouched.
+                    val signature = ModuleDefinition.signature(name, family.name, family.itemType)
+                    creationState.modules[index] = module.copy(
+                        name = name,
                         itemFamilyId = family.id,
                         itemName = family.name,
-                        code = code
+                        code = signature + "\n" + moduleFunctionBody(module.code) + "\n"
                     )
                     save()
                 }
-                changingInput = null
-            }
-        )
-    }
-
-    renaming?.let { module ->
-        RenameModuleDialog(
-            module = module,
-            onDismiss = { renaming = null },
-            onRename = { newName ->
-                val index = creationState.modules.indexOfFirst { it.id == module.id }
-                if (index >= 0) {
-                    val previous = ModuleDefinition.pythonFunctionName(module.name)
-                    val next = ModuleDefinition.pythonFunctionName(newName)
-                    val code = if (previous != next) {
-                        Regex("(?m)^(\\s*def\\s+)" + Regex.escape(previous) + "\\b").replace(module.code, "$1" + next)
-                    } else {
-                        module.code
-                    }
-                    creationState.modules[index] = creationState.modules[index].copy(name = newName, code = code)
-                    save()
-                }
-                renaming = null
+                editingModule = null
             }
         )
     }
@@ -320,24 +293,14 @@ private fun attachmentLabel(creationState: CreationState, attachment: ModuleAtta
         ModuleTargetKind.SET -> "Set (missing)"
     }
 
-/** The code without its `def …:` line — the row already shows that signature. */
-internal fun moduleFunctionBody(code: String): String {
-    val lines = code.lines()
-    val signature = lines.indexOfFirst { line ->
-        line.trimStart().startsWith("def ") && line.trimEnd().endsWith(":")
-    }
-    return if (signature >= 0) lines.drop(signature + 1).joinToString("\n").trimEnd() else code.trimEnd()
-}
-
 @Composable
 private fun ModuleCard(
     module: ModuleDefinition,
+    itemType: ItemType?,
     initiallyExpanded: Boolean = false,
     attachments: List<ModuleAttachment>,
     attachmentLabel: (ModuleAttachment) -> String,
     onEdit: () -> Unit,
-    onChangeInput: () -> Unit,
-    onRename: () -> Unit,
     onAttach: () -> Unit,
     onDetach: (ModuleAttachment) -> Unit,
     onDelete: () -> Unit
@@ -345,8 +308,7 @@ private fun ModuleCard(
     // One line per module — the signature — and tapping it unfolds the code, exactly like an
     // exercise row in the session screen unfolds its sets.
     var expanded by remember(module.id) { mutableStateOf(initiallyExpanded) }
-    val signature = "def " + ModuleDefinition.pythonFunctionName(module.name) +
-        "(" + ModuleDefinition.pythonParameterName(module.itemName) + "):"
+    val signature = ModuleDefinition.signature(module.name, module.itemName, itemType)
     val body = moduleFunctionBody(module.code)
 
     Column(
@@ -386,27 +348,20 @@ private fun ModuleCard(
                     onDismissRequest = { menuOpen = false },
                     modifier = Modifier.background(DarkSurfaceAlt)
                 ) {
-                    listOf(
-                        "Edit code" to onEdit,
-                        "Attach" to onAttach,
-                        "Change input" to onChangeInput,
-                        "Rename" to onRename,
-                        "Delete" to onDelete
-                    ).forEach { (label, action) ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = label,
-                                    color = if (label == "Delete") AccentRed else TextPrimary,
-                                    fontSize = 13.sp
-                                )
-                            },
-                            onClick = {
-                                menuOpen = false
-                                action()
-                            }
-                        )
-                    }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.edit)) },
+                        onClick = {
+                            menuOpen = false
+                            onEdit()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.delete), color = AccentRed) },
+                        onClick = {
+                            menuOpen = false
+                            onDelete()
+                        }
+                    )
                 }
             }
         }
@@ -672,23 +627,33 @@ private fun RenameModuleDialog(
  * input (every item except images). Everything after that happens in the editor.
  */
 @Composable
-private fun NewModuleDialog(
+private fun ModuleFormDialog(
     creationState: CreationState,
+    editing: ModuleDefinition?,
     onDismiss: () -> Unit,
-    onCreate: (String, ItemFamily) -> Unit
+    onSubmit: (String, ItemFamily) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var familyId by remember { mutableStateOf<Long?>(null) }
+    var name by remember { mutableStateOf(editing?.name ?: "") }
+    var familyId by remember { mutableStateOf(editing?.itemFamilyId) }
     var expanded by remember { mutableStateOf(false) }
 
     val selectable = creationState.itemFamilies.filter { it.itemType != ItemType.IMAGE }
     val chosen = selectable.find { it.id == familyId }
     val ready = name.isNotBlank() && chosen != null
+    val preview = chosen?.let {
+        ModuleDefinition.signature(name.ifBlank { "module" }, it.name, it.itemType)
+    } ?: "def module(item: int):"
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = DarkSurfaceAlt,
-        title = { Text("New module", color = TextPrimary, fontWeight = FontWeight.Bold) },
+        title = {
+            Text(
+                text = if (editing == null) "New module" else "Edit module",
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
             Column {
                 Text("Name", color = TextMuted, fontSize = 11.sp)
@@ -697,7 +662,7 @@ private fun NewModuleDialog(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
-                    placeholder = { Text("Deadlift form", color = TextMuted.copy(alpha = 0.5f), fontSize = 13.sp) },
+                    placeholder = { Text("test", color = TextMuted.copy(alpha = 0.5f), fontSize = 13.sp) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AccentOrange,
                         unfocusedBorderColor = TextMuted.copy(alpha = 0.3f),
@@ -756,8 +721,7 @@ private fun NewModuleDialog(
                     }
                 }
                 Text(
-                    text = "the function will read def apply(" +
-                        (chosen?.let { ModuleDefinition.pythonParameterName(it.name) } ?: "item") + "):",
+                    text = preview,
                     color = TextMuted.copy(alpha = 0.7f),
                     fontFamily = FontFamily.Monospace,
                     fontSize = 9.sp,
@@ -766,8 +730,12 @@ private fun NewModuleDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { if (ready) onCreate(name.trim(), chosen!!) }, enabled = ready) {
-                Text("Create", color = if (ready) AccentOrange else TextMuted, fontWeight = FontWeight.Bold)
+            TextButton(onClick = { if (ready) onSubmit(name.trim(), chosen!!) }, enabled = ready) {
+                Text(
+                    text = if (editing == null) "Create" else "Save",
+                    color = if (ready) AccentOrange else TextMuted,
+                    fontWeight = FontWeight.Bold
+                )
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } }

@@ -1,5 +1,6 @@
 package com.ymz.basicplanner.model.module
 
+import com.ymz.basicplanner.model.ItemType
 import kotlinx.serialization.Serializable
 
 /** What a module can be attached to. */
@@ -39,13 +40,26 @@ data class ModuleDefinition(
 ) {
     companion object {
         /**
-         * The prototype a new module starts from: the function is named after the module itself
-         * (`def deadlift_form(form):`), and its single parameter after the chosen item.
+         * The signature a module carries: named after the module, its single parameter named and
+         * typed after the chosen item — `def test(max: int):`.
          */
-        fun defaultCodeFor(moduleName: String, itemName: String): String {
+        fun signature(moduleName: String, itemName: String, itemType: ItemType? = null): String {
             val fn = pythonFunctionName(moduleName)
             val param = pythonParameterName(itemName)
-            return "def $fn($param):\n" +
+            return "def $fn($param: ${pythonTypeName(itemType)}):"
+        }
+
+        fun pythonTypeName(itemType: ItemType?): String = when (itemType) {
+            ItemType.INT -> "int"
+            ItemType.FLOAT -> "float"
+            ItemType.BOOLEAN -> "bool"
+            ItemType.STRING, ItemType.VIDEO, ItemType.IMAGE, null -> "str"
+        }
+
+        /** A new module starts with its signature, then this body. */
+        fun defaultCodeFor(moduleName: String, itemName: String, itemType: ItemType? = null): String {
+            val param = pythonParameterName(itemName)
+            return signature(moduleName, itemName, itemType) + "\n" +
                 "    # $param is this item's value, typed\n" +
                 "    # return sets, reps, percent, time\n" +
                 "    # deltas: 0 means no change\n" +

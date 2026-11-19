@@ -1,5 +1,6 @@
 package com.ymz.basicplanner
 
+import com.ymz.basicplanner.model.ItemType
 import com.ymz.basicplanner.model.module.ModuleDefinition
 import com.ymz.basicplanner.ui.moduleFunctionBody
 import org.junit.Assert.assertEquals
@@ -14,7 +15,15 @@ class ModuleCodeTest {
         assertEquals("max", ModuleDefinition.pythonParameterName("max"))
         assertEquals("max_effort", ModuleDefinition.pythonParameterName("Max effort"))
         assertEquals("note", ModuleDefinition.pythonParameterName("  Note "))
-        assertTrue(ModuleDefinition.defaultCodeFor("Deadlift form", "max").startsWith("def deadlift_form(max):"))
+        assertTrue(ModuleDefinition.defaultCodeFor("Deadlift form", "max", ItemType.INT).startsWith("def deadlift_form(max: int):"))
+    }
+
+    @Test
+    fun the_signature_carries_the_parameter_type() {
+        assertEquals("def test(max: int):", ModuleDefinition.signature("test", "max", ItemType.INT))
+        assertEquals("def test(sleep: float):", ModuleDefinition.signature("test", "sleep", ItemType.FLOAT))
+        assertEquals("def test(ok: bool):", ModuleDefinition.signature("test", "ok", ItemType.BOOLEAN))
+        assertEquals("def test(note: str):", ModuleDefinition.signature("test", "note", ItemType.STRING))
     }
 
     @Test
@@ -35,7 +44,7 @@ class ModuleCodeTest {
 
     @Test
     fun the_folded_row_shows_the_body_without_the_signature() {
-        val code = ModuleDefinition.defaultCodeFor("Deadlift form", "form")
+        val code = ModuleDefinition.defaultCodeFor("Deadlift form", "form", ItemType.INT)
         val body = moduleFunctionBody(code)
         assertTrue(!body.contains("def deadlift_form"))
         assertTrue(body.contains("return 0, 0, 0.0, 0"))
@@ -49,7 +58,7 @@ class ModuleCodeTest {
 
     @Test
     fun the_default_body_returns_four_deltas() {
-        val code = ModuleDefinition.defaultCodeFor("Deadlift form", "note")
+        val code = ModuleDefinition.defaultCodeFor("Deadlift form", "note", ItemType.INT)
         assertTrue(code.contains("return -1, -1, -10.0, 60"))
         assertTrue(code.contains("return 0, 0, 0.0, 0"))
         assertTrue(code.contains("if note >= 8:"))
