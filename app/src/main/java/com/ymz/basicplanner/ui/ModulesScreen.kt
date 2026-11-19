@@ -370,6 +370,15 @@ private fun ModuleCard(
                             onEdit()
                         }
                     )
+                    if (attachments.isNotEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("Remove", color = AccentRed, fontSize = 13.sp) },
+                            onClick = {
+                                menuOpen = false
+                                attachments.forEach(onDetach)
+                            }
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("Delete", color = AccentRed, fontSize = 13.sp) },
                         onClick = {
@@ -427,12 +436,6 @@ private fun ModuleCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        "remove",
-                        color = AccentRed.copy(alpha = 0.9f),
-                        fontSize = 10.sp,
-                        modifier = Modifier.clickable { onDetach(attachment) }.padding(4.dp)
                     )
                 }
             }
