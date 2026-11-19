@@ -80,6 +80,53 @@ fun buildProgramCalendar(
     return slots
 }
 
+/** The week and the block chain (level 0 → deepest) that a calendar date belongs to. */
+data class AgendaSection(
+    val week: com.ymz.basicplanner.model.WeekEntity,
+    val blockChain: List<BlockEntity>
+)
+
+/**
+ * Same walk as [buildProgramCalendar], but records the section each date belongs to: its week and
+ * every block above it, so the agenda can label a week at any nesting level. Blocks may contain
+ * blocks, so the chain is what carries the levels.
+ */
+fun buildProgramSections(
+    program: ProgramEntity,
+    startDate: LocalDate,
+    creationState: CreationState
+): Map<LocalDate, AgendaSection> {
+    val sections = mutableMapOf<LocalDate, AgendaSection>()
+    var currentDate = startDate
+
+    fun processWeek(weekId: Long, isFirst: Boolean, weekIdx: Int, chain: List<BlockEntity>) {
+        val week = creationState.weeks.find { it.id == weekId } ?: return
+        val startDayIndex = if (isFirst && weekIdx == 0) startDate.dayOfWeek.value - 1 else 0
+        for (i in startDayIndex until 7) {
+            sections[currentDate] = AgendaSection(week, chain)
+            currentDate = currentDate.plusDays(1)
+        }
+    }
+
+    fun processBlock(block: BlockEntity, isFirst: Boolean, chain: List<BlockEntity>) {
+        val here = chain + block
+        block.subBlockIds.forEach { subId ->
+            creationState.blocks.find { it.id == subId }?.let { processBlock(it, false, here) }
+        }
+        block.weekIds.forEachIndexed { weekIdx, weekId -> processWeek(weekId, isFirst, weekIdx, here) }
+    }
+
+    program.blockIds.forEach { id ->
+        val block = creationState.blocks.find { it.id == id }
+        if (block != null) {
+            processBlock(block, true, emptyList())
+        } else {
+            creationState.weeks.find { it.id == id }?.let { processWeek(it.id, true, 0, emptyList()) }
+        }
+    }
+    return sections
+}
+
 fun calculateDateFromGrid(offset: Offset, gridSize: androidx.compose.ui.unit.IntSize, visibleDates: List<LocalDate>): LocalDate? {
     val colWidth = gridSize.width / 7f
     val rowHeight = gridSize.height / 6f

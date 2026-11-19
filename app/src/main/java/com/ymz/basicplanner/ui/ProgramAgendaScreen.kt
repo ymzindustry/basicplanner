@@ -10,6 +10,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -50,6 +53,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -192,6 +196,19 @@ fun ProgramAgendaScreen(
             emptyMap()
         }
     }
+    // Sections of the whole program, and the block level the agenda labels.
+    val agendaSections = remember(selectedProgram, selectedActiveProgram, creationState.blocks, creationState.weeks, creationState.dataVersion.value) {
+        if (selectedProgram != null && selectedActiveProgram != null) {
+            buildProgramSections(selectedProgram!!, selectedActiveProgram!!.startDate, creationState)
+        } else {
+            emptyMap()
+        }
+    }
+    val maxBlockDepth = remember(agendaSections) {
+        agendaSections.values.maxOfOrNull { it.blockChain.size } ?: 0
+    }
+    var blockLevel by remember(selectedProgram?.id) { mutableStateOf(0) }
+
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -475,6 +492,54 @@ fun ProgramAgendaScreen(
                     }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                if (maxBlockDepth > 1) {
+                    var levelMenu by remember { mutableStateOf(false) }
+                    Box {
+                        Row(
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(DarkSurfaceAlt)
+                                .border(
+                                    1.dp,
+                                    if (blockLevel > 0) AccentOrange.copy(alpha = 0.7f) else TextMuted.copy(alpha = 0.3f),
+                                    RoundedCornerShape(50)
+                                )
+                                .clickable { levelMenu = true }
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Lvl $blockLevel",
+                                color = if (blockLevel > 0) AccentOrange else TextMuted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Icon(Icons.Default.ArrowDropDown, "block level", tint = TextMuted, modifier = Modifier.size(16.dp))
+                        }
+                        DropdownMenu(
+                            expanded = levelMenu,
+                            onDismissRequest = { levelMenu = false },
+                            modifier = Modifier.background(DarkSurfaceAlt)
+                        ) {
+                            (0 until maxBlockDepth).forEach { level ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = "Level $level",
+                                            color = if (level == blockLevel) AccentOrange else TextPrimary,
+                                            fontSize = 13.sp
+                                        )
+                                    },
+                                    onClick = {
+                                        blockLevel = level
+                                        levelMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
                 WeekdayRow()
                 Spacer(modifier = Modifier.height(4.dp))
                 if (selectedProgram != null && selectedActiveProgram != null && daysByDate.isNotEmpty()) {
@@ -488,94 +553,24 @@ fun ProgramAgendaScreen(
                     }
 
 
-                    val (blockIndicators, weekIndicators) = remember(
-                        program,
-                        activeProgram,
-                        visibleDates,
-                        creationState.blocks,
-                        creationState.weeks
-                    ) {
-                        val blockIndicators = mutableMapOf<Int, Pair<BlockEntity, Int>>()
-                        val weekIndicators = mutableMapOf<Int, Triple<WeekEntity, Int, Int>>()
+                    val sections = agendaSections
 
-
-                            val calendarInfo = mutableMapOf<LocalDate, CalendarDayInfo>()
-                            val blockStartDates = mutableMapOf<Long, LocalDate>()
-                            val weekStartDates = mutableSetOf<LocalDate>()
-                            var currentDate = activeProgram.startDate
-
-                            program.blockIds.forEachIndexed { blockIndex, blockId ->
-                                val block = creationState.blocks.find { it.id == blockId }
-                                if (block != null) {
-                                    if (!blockStartDates.containsKey(block.id)) {
-                                        blockStartDates[block.id] = currentDate
-                                    }
-                                    block.weekIds.forEachIndexed { weekIndexInBlock, weekId ->
-                                        val week = creationState.weeks.find { it.id == weekId }
-                                        if (week != null) {
-
-                                            weekStartDates.add(currentDate)
-
-                                            repeat(7) {
-                                                calendarInfo[currentDate] = CalendarDayInfo(
-                                                    week = week,
-                                                    block = block,
-                                                    weekIndexInBlock = weekIndexInBlock + 1,
-                                                    blockIndexInProgram = blockIndex + 1
-                                                )
-                                                currentDate = currentDate.plusDays(1)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-
-                            (0 until 6).forEach { weekIndex ->
-                                val datesInRow = (0..6).map { visibleDates[weekIndex * 7 + it] }
-                                val programInfosInRow = datesInRow.mapNotNull { calendarInfo[it] }
-
-                                if (programInfosInRow.isNotEmpty()) {
-                                    val isFirstVisibleRow = (weekIndex == 0)
-
-
-                                    val startingBlockDate =
-                                        datesInRow.find { blockStartDates.containsValue(it) }
-                                    if (startingBlockDate != null) {
-                                        calendarInfo[startingBlockDate]?.let { info ->
-                                            blockIndicators[weekIndex] =
-                                                Pair(info.block, info.blockIndexInProgram)
-                                        }
-                                    } else if (isFirstVisibleRow) {
-                                        blockIndicators[weekIndex] = Pair(
-                                            programInfosInRow.first().block,
-                                            programInfosInRow.first().blockIndexInProgram
-                                        )
-                                    }
-
-
-
-                                    val startingWeekDate =
-                                        datesInRow.find { weekStartDates.contains(it) }
-                                    if (startingWeekDate != null) {
-                                        calendarInfo[startingWeekDate]?.let { info ->
-                                            weekIndicators[weekIndex] = Triple(
-                                                info.week,
-                                                info.blockIndexInProgram,
-                                                info.weekIndexInBlock
-                                            )
-                                        }
-                                    } else if (isFirstVisibleRow) {
-                                        weekIndicators[weekIndex] = Triple(
-                                            programInfosInRow.first().week,
-                                            programInfosInRow.first().blockIndexInProgram,
-                                            programInfosInRow.first().weekIndexInBlock
-                                        )
-                                    }
-                                }
-                            }
-                        Pair(blockIndicators, weekIndicators)
+                    val blockIndicators = remember(sections, visibleDates, blockLevel) {
+                        (0 until 6).mapNotNull { row ->
+                            val datesInRow = (0..6).map { visibleDates[row * 7 + it] }
+                            val section = datesInRow.firstNotNullOfOrNull { sections[it] } ?: return@mapNotNull null
+                            val block = section.blockChain.getOrNull(blockLevel) ?: return@mapNotNull null
+                            row to block
+                        }.toMap()
                     }
+                    val weekIndicators = remember(sections, visibleDates) {
+                        (0 until 6).mapNotNull { row ->
+                            val datesInRow = (0..6).map { visibleDates[row * 7 + it] }
+                            val section = datesInRow.firstNotNullOfOrNull { sections[it] } ?: return@mapNotNull null
+                            row to section.week
+                        }.toMap()
+                    }
+
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -773,7 +768,7 @@ fun ProgramAgendaScreen(
                                         .fillMaxWidth()
                                 ) {
 
-                                    blockIndicators[weekIndex]?.let { (block, blockIndex) ->
+                                    blockIndicators[weekIndex]?.let { block ->
                                         Box(
                                             modifier = Modifier
                                                 .align(Alignment.BottomStart)
@@ -805,7 +800,7 @@ fun ProgramAgendaScreen(
                                         }
                                     }
 
-                                    weekIndicators[weekIndex]?.let { (week, blockIndex, weekIndexInBlock) ->
+                                    weekIndicators[weekIndex]?.let { week ->
                                         Box(
                                             modifier = Modifier
                                                 .align(Alignment.BottomEnd)
