@@ -761,7 +761,7 @@ private fun HangItemContent(
 }
 
 /** Bubble colour per item type: the type is recognisable at a glance without reading a label. */
-private fun itemTypeColor(type: ItemType): Color = when (type) {
+fun itemTypeColor(type: ItemType): Color = when (type) {
     ItemType.STRING -> Color(0xFF64B5F6)  // blue
     ItemType.INT -> Color(0xFFFFB74D)     // orange
     ItemType.FLOAT -> Color(0xFF81C784)   // green

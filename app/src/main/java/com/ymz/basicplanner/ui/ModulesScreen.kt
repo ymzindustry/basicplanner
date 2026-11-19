@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -72,6 +74,7 @@ import com.ymz.basicplanner.compose.ScrollingText
 import com.ymz.basicplanner.data.AppStateStore
 import com.ymz.basicplanner.data.PythonModuleExecutor
 import com.ymz.basicplanner.model.CreationState
+import com.ymz.basicplanner.compose.itemTypeColor
 import com.ymz.basicplanner.compose.highlightPython
 import com.ymz.basicplanner.model.ItemType
 import com.ymz.basicplanner.model.ItemFamily
@@ -672,84 +675,89 @@ private fun ModuleFormDialog(
         ModuleDefinition.signature(name.ifBlank { "module" }, it.name, it.itemType)
     } ?: "def module(item: int):"
 
+    // Same chrome as the movement edit dialog in the creation screen.
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = DialogProperties(),
         containerColor = DarkSurfaceAlt,
-        shape = RoundedCornerShape(20.dp),
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextMuted)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = ready, onClick = { if (ready) onSubmit(name.trim(), chosen!!) }) {
+                Text(
+                    text = "OK",
+                    color = if (ready) AccentOrange else TextMuted.copy(alpha = 0.5f),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
         title = {
             Text(
-                text = if (editing == null) "New module" else "Edit module",
-                color = TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                text = if (editing == null) "Create" else "Edit",
+                color = TextPrimary
             )
         },
         text = {
-            Column {
-                Text("NAME", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(DarkSurface)
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                ) {
-                    BasicTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        singleLine = true,
-                        textStyle = TextStyle(
-                            color = TextPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        cursorBrush = SolidColor(AccentOrange),
-                        decorationBox = { inner ->
-                            Box {
-                                if (name.isEmpty()) {
-                                    Text("test", color = TextMuted.copy(alpha = 0.5f), fontSize = 14.sp)
-                                }
-                                inner()
-                            }
-                        }
-                    )
-                }
+            Column(Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    placeholder = { Text("test", color = TextMuted) },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = TextMuted,
+                        focusedBorderColor = AccentOrange,
+                        unfocusedLabelColor = TextMuted,
+                        focusedLabelColor = AccentOrange,
+                        cursorColor = AccentOrange,
+                        unfocusedTextColor = TextPrimary,
+                        focusedTextColor = TextPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 Spacer(Modifier.height(16.dp))
-                Text("INPUT", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
 
+                // Items, in the coloured bubbles used everywhere else in the app.
                 if (selectable.isEmpty()) {
-                    Text("No item available — images cannot feed a module.", color = AccentRed, fontSize = 11.sp)
+                    Text("No item available — images cannot feed a module.", color = AccentRed, fontSize = 12.sp)
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         selectable.chunked(3).forEach { row ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 row.forEach { family ->
+                                    val color = itemTypeColor(family.itemType)
                                     val selected = family.id == familyId
-                                    Row(
+                                    Box(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(50))
-                                            .background(if (selected) AccentOrange else DarkSurface)
+                                            .height(40.dp)
+                                            .widthIn(max = 168.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(color.copy(alpha = if (selected) 0.28f else 0.12f))
                                             .border(
                                                 width = 1.dp,
-                                                color = if (selected) AccentOrange else TextMuted.copy(alpha = 0.25f),
-                                                shape = RoundedCornerShape(50)
+                                                color = color.copy(alpha = if (selected) 0.95f else 0.5f),
+                                                shape = RoundedCornerShape(14.dp)
                                             )
                                             .clickable {
                                                 familyId = family.id
                                                 if (name.isBlank()) name = family.name
                                             }
-                                            .padding(horizontal = 12.dp, vertical = 7.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .padding(horizontal = 10.dp),
+                                        contentAlignment = Alignment.CenterStart
                                     ) {
                                         Text(
                                             text = family.name,
-                                            color = if (selected) DarkBackground else TextMuted,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                            maxLines = 1
+                                            color = TextPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }
@@ -758,25 +766,15 @@ private fun ModuleFormDialog(
                     }
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(14.dp))
                 Text(
                     text = preview,
-                    color = TextMuted.copy(alpha = 0.75f),
+                    color = TextMuted,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp
                 )
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { if (ready) onSubmit(name.trim(), chosen!!) }, enabled = ready) {
-                Text(
-                    text = if (editing == null) "Create" else "Save",
-                    color = if (ready) AccentOrange else TextMuted,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } }
+        }
     )
 }
 
