@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Icon
@@ -60,6 +61,7 @@ fun CreationScreen(
     tutorialActive: Boolean = false,
     tutorialDialogActive: Boolean = false,
     onCreateRequested: () -> Unit = {},
+    onOpenModules: () -> Unit = {},
     onTutorialDialogConfirmed: () -> Unit = {},
     onTutorialDialogSkipped: () -> Unit = {}
 ) {
@@ -180,6 +182,13 @@ fun CreationScreen(
                     }
                 },
                 rightButtons = {
+                    IconButton(onClick = onOpenModules, enabled = !tutorialActive) {
+                        Icon(
+                            imageVector = Icons.Default.Code,
+                            contentDescription = "Modules",
+                            tint = AccentOrange
+                        )
+                    }
                     IconButton(
                         onClick = {
                             editingEntity = null

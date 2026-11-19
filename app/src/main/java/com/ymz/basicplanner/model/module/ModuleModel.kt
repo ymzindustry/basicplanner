@@ -171,6 +171,12 @@ data class ModuleAttachment(
     val programId: Long,
     val targetKind: ModuleTargetKind,
     val targetId: Long,
+    /**
+     * The entity that supplies the module's item value. It must belong to [programId]; by default
+     * the parent of the target, otherwise the target itself. Lets a day read another day.
+     */
+    val inputEntityId: Long? = null,
+    val inputEntityLabel: String = "",
     val bindings: List<ModuleInputBinding> = emptyList()
 )
 

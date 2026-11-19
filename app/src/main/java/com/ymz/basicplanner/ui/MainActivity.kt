@@ -136,6 +136,7 @@ class MainActivity : ComponentActivity() {
                                         tutorialGuiding = false
                                     }
                                 },
+                                onOpenModules = { showModules = true },
                                 onTutorialDialogConfirmed = {
                                     if (showTutorial) tutorialStep = 5
                                 },

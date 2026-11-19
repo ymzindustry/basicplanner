@@ -137,6 +137,11 @@ class ModuleEngine(private val executor: ModuleExecutor) {
             if (affected.isEmpty()) return@forEach
 
             val context = buildContext(app, ap, session, attachment, affected, module)
+            if (module.itemFamilyId != null && context.item == null) {
+                // The input entity carries no value for this item: nothing to decide on.
+                return@forEach
+            }
+
             val output = try {
                 executor.run(module, json.encodeToString(ModuleContext.serializer(), context))
             } catch (t: Throwable) {
@@ -265,7 +270,23 @@ class ModuleEngine(private val executor: ModuleExecutor) {
         // itself when it carries the item, otherwise from the closest ancestor that does.
         var itemInfo: ModuleItemInfo? = null
         val familyId = module?.itemFamilyId
-        if (familyId != null) {
+        val inputEntityId = attachment.inputEntityId
+        if (familyId != null && inputEntityId != null) {
+            val family = families[familyId]
+            val value = app.items
+                .filter { it.itemFamilyId == familyId && it.entityId == inputEntityId }
+                .filter { it.activeProgramId == null || it.activeProgramId == ap.id }
+                .firstOrNull()?.value
+            if (value != null) {
+                val name = family?.name ?: module.itemName
+                if (name.isNotBlank()) items[name] = value
+                itemInfo = ModuleItemInfo(
+                    name = name,
+                    type = family?.itemType?.name?.lowercase() ?: "string",
+                    value = value
+                )
+            }
+        } else if (familyId != null) {
             val family = families[familyId]
             val familyName = family?.name ?: module.itemName
             val typeLabel = family?.itemType?.name?.lowercase() ?: "string"

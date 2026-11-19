@@ -333,13 +333,13 @@ private fun ModuleCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = !expanded }
-                .padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                .padding(start = 12.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = highlightPython(signature),
                 fontFamily = FontFamily.Monospace,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -347,13 +347,14 @@ private fun ModuleCard(
             Icon(
                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = if (expanded) "hide code" else "show code",
-                tint = TextMuted
+                tint = TextMuted,
+                modifier = Modifier.size(20.dp)
             )
 
             var menuOpen by remember { mutableStateOf(false) }
             Box {
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Default.MoreVert, "module actions", tint = TextMuted)
+                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.MoreVert, "module actions", tint = TextMuted, modifier = Modifier.size(18.dp))
                 }
                 // Exactly the menu the creation screen shows for an entity cell: default Material
                 // dropdown (light panel), plain labels, Delete in red.

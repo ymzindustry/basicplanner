@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
@@ -468,6 +469,50 @@ fun ProgramAgendaScreen(
                                 )
                             }
                         } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (maxBlockDepth > 1) {
+                                var levelMenu by remember { mutableStateOf(false) }
+                                Box {
+                                    TextButton(onClick = { levelMenu = true }) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.AccountTree,
+                                                contentDescription = "block level",
+                                                tint = AccentOrange,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "Lvl $blockLevel",
+                                                color = AccentOrange,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                        }
+                                    }
+                                    DropdownMenu(
+                                        expanded = levelMenu,
+                                        onDismissRequest = { levelMenu = false },
+                                        modifier = Modifier.background(DarkSurfaceAlt)
+                                    ) {
+                                        (0 until maxBlockDepth).forEach { level ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = "Level $level",
+                                                        color = if (level == blockLevel) AccentOrange else TextPrimary,
+                                                        fontSize = 13.sp
+                                                    )
+                                                },
+                                                onClick = {
+                                                    blockLevel = level
+                                                    levelMenu = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                             ProgramSelector(
                                 creationState = creationState,
                                 programs = programs,
@@ -488,58 +533,11 @@ fun ProgramAgendaScreen(
                                     }
                                 }
                             )
+                            }
                         }
                     }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                if (maxBlockDepth > 1) {
-                    var levelMenu by remember { mutableStateOf(false) }
-                    Box {
-                        Row(
-                            modifier = Modifier
-                                .padding(start = 8.dp)
-                                .clip(RoundedCornerShape(50))
-                                .background(DarkSurfaceAlt)
-                                .border(
-                                    1.dp,
-                                    if (blockLevel > 0) AccentOrange.copy(alpha = 0.7f) else TextMuted.copy(alpha = 0.3f),
-                                    RoundedCornerShape(50)
-                                )
-                                .clickable { levelMenu = true }
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Lvl $blockLevel",
-                                color = if (blockLevel > 0) AccentOrange else TextMuted,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Icon(Icons.Default.ArrowDropDown, "block level", tint = TextMuted, modifier = Modifier.size(16.dp))
-                        }
-                        DropdownMenu(
-                            expanded = levelMenu,
-                            onDismissRequest = { levelMenu = false },
-                            modifier = Modifier.background(DarkSurfaceAlt)
-                        ) {
-                            (0 until maxBlockDepth).forEach { level ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = "Level $level",
-                                            color = if (level == blockLevel) AccentOrange else TextPrimary,
-                                            fontSize = 13.sp
-                                        )
-                                    },
-                                    onClick = {
-                                        blockLevel = level
-                                        levelMenu = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
                 WeekdayRow()
                 Spacer(modifier = Modifier.height(4.dp))
                 if (selectedProgram != null && selectedActiveProgram != null && daysByDate.isNotEmpty()) {
