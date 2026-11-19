@@ -313,17 +313,7 @@ fun CreationScreen(
                                     entityAction = pressed to pressedKind
                                 }
                             },
-                            onAddAdjustment = {
-                                if (!tutorialActive) {
-                                    editingEntity = entity
-                                    showDialog = true
-                                }
-                            },
-                            onAddModule = {
-                                if (!tutorialActive) {
-                                    modulePickerFor = entity to currentKind
-                                }
-                            },
+
                             onEdit = { entityToEdit ->
                                 if (!tutorialActive) {
                                     editingEntity = entityToEdit
@@ -493,15 +483,36 @@ fun CreationScreen(
     }
 
     entityAction?.let { (pressed, pressedKind) ->
+        val kind = moduleTargetKindOf(pressedKind)
+        val adjustment = when (pressed) {
+            is com.ymz.basicplanner.model.SessionEntity -> pressed.adjustmentPercent
+            is com.ymz.basicplanner.model.DayEntity -> pressed.adjustmentPercent
+            is com.ymz.basicplanner.model.WeekEntity -> pressed.adjustmentPercent
+            is com.ymz.basicplanner.model.BlockEntity -> pressed.adjustmentPercent
+            is com.ymz.basicplanner.model.ProgramEntity -> pressed.adjustmentPercent
+            else -> 0
+        }
+        val attached = if (kind == null) emptyList() else creationState.moduleAttachments
+            .filter { it.targetKind == kind && it.targetId == pressed.id }
+            .mapNotNull { attachment -> creationState.modules.find { it.id == attachment.moduleId } }
+
         EntityActionDialog(
             entityLabel = pressed.name.ifBlank { pressedKind.moduleLabel() },
             kindLabel = pressedKind.moduleLabel(),
-            onAdjustment = {
-                editingEntity = pressed
-                showDialog = true
-                entityAction = null
+            adjustment = adjustment,
+            modules = attached,
+            onAdjustmentChange = { value ->
+                when (pressed) {
+                    is com.ymz.basicplanner.model.SessionEntity -> pressed.adjustmentPercent = value
+                    is com.ymz.basicplanner.model.DayEntity -> pressed.adjustmentPercent = value
+                    is com.ymz.basicplanner.model.WeekEntity -> pressed.adjustmentPercent = value
+                    is com.ymz.basicplanner.model.BlockEntity -> pressed.adjustmentPercent = value
+                    is com.ymz.basicplanner.model.ProgramEntity -> pressed.adjustmentPercent = value
+                    else -> {}
+                }
+                scope.launch { AppStateStore.save(context, creationState.toAppState()) }
             },
-            onModule = {
+            onAddModule = {
                 modulePickerFor = pressed to pressedKind
                 entityAction = null
             },

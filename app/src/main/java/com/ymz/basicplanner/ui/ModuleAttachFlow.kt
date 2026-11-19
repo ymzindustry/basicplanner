@@ -3,6 +3,7 @@ package com.ymz.basicplanner.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +26,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -125,21 +131,37 @@ fun entitiesOfProgram(
 
 // ---------------------------------------------------------------- dialogs
 
-/** The two things that can be hung on an entity. */
+/**
+ * What can be hung on an entity, in one dialog: its adjustment (typed here, zero by default) and
+ * the modules already attached, with a way to add another.
+ */
 @Composable
 fun EntityActionDialog(
     entityLabel: String,
     kindLabel: String,
-    onAdjustment: () -> Unit,
-    onModule: () -> Unit,
+    adjustment: Int,
+    modules: List<ModuleDefinition>,
+    onAdjustmentChange: (Int) -> Unit,
+    onAddModule: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var value by remember { mutableStateOf(adjustment.toString()) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(),
         containerColor = DarkSurfaceAlt,
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onAdjustmentChange(value.toIntOrNull() ?: 0)
+                onDismiss()
+            }) {
+                Text("OK", color = AccentOrange, fontWeight = FontWeight.Bold)
+            }
+        },
         title = {
             Column {
                 Text(entityLabel, color = TextPrimary, fontWeight = FontWeight.Bold)
@@ -147,9 +169,82 @@ fun EntityActionDialog(
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ActionRow("Add adjustment", onAdjustment)
-                ActionRow("Add module", onModule)
+            Column {
+                Text("ADJUSTMENT", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(DarkSurface)
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        BasicTextField(
+                            value = value,
+                            onValueChange = { text ->
+                                if (text.isEmpty() || text.matches(Regex("-?\\d{0,3}"))) value = text
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            textStyle = TextStyle(
+                                color = TextPrimary,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            cursorBrush = SolidColor(AccentOrange),
+                            decorationBox = { inner ->
+                                Box {
+                                    if (value.isEmpty()) {
+                                        Text("0", color = TextMuted.copy(alpha = 0.5f), fontSize = 15.sp)
+                                    }
+                                    inner()
+                                }
+                            }
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text("%", color = TextMuted, fontSize = 14.sp)
+                }
+
+                Spacer(Modifier.height(18.dp))
+                Text("MODULES", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+
+                modules.forEach { module ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(DarkSurface)
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = highlightPython(
+                                "def " + ModuleDefinition.pythonFunctionName(module.name) +
+                                    "(" + ModuleDefinition.pythonParameterName(module.itemName) + "):"
+                            ),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(AccentOrange.copy(alpha = 0.12f))
+                        .clickable(onClick = onAddModule)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("+ Add module", color = AccentOrange, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     )

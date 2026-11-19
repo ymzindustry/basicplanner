@@ -75,9 +75,6 @@ fun EntityRow(
     onCopy: () -> Unit,
     onDelete: () -> Unit,
     onLongPress: ((BaseEntity, EntityKind) -> Unit)? = null,
-    /** Fallback entries in the ⋯ menu, for devices where the long press is swallowed. */
-    onAddModule: (() -> Unit)? = null,
-    onAddAdjustment: (() -> Unit)? = null,
     enabled: Boolean = true
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -195,24 +192,6 @@ fun EntityRow(
                                 onEdit(entity)
                             }
                         )
-                        if (onAddAdjustment != null) {
-                            DropdownMenuItem(
-                                text = { Text("Add adjustment") },
-                                onClick = {
-                                    menuExpanded = false
-                                    onAddAdjustment()
-                                }
-                            )
-                        }
-                        if (onAddModule != null) {
-                            DropdownMenuItem(
-                                text = { Text("Add module") },
-                                onClick = {
-                                    menuExpanded = false
-                                    onAddModule()
-                                }
-                            )
-                        }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.action_copy)) },
                             onClick = {
@@ -246,6 +225,7 @@ fun EntityRow(
                     dailyRms = emptyMap(),
                     showRmInfo = false,
                     onEdit = onEdit,
+                    onLongPress = onLongPress,
                     actionContent = { _, _, _ -> }
                 )
             }
@@ -276,6 +256,7 @@ fun EntityTreeItem(
     dailyRms: Map<Long, Int> = emptyMap(),
     showRmInfo: Boolean = false,
     onEdit: ((BaseEntity) -> Unit)? = null,
+    onLongPress: ((BaseEntity, EntityKind) -> Unit)? = null,
     /** Optional action drawn on the root row itself (same slot as a child row's action). */
     rootActionContent: (@Composable (BaseEntity, EntityKind, Color) -> Unit)? = null,
     /** Optional replacement of the tree's own children (used to show a bare slot as its session). */
@@ -319,7 +300,10 @@ fun EntityTreeItem(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { expanded = !expanded }
+                    .combinedClickable(
+                        onClick = { expanded = !expanded },
+                        onLongClick = { onLongPress?.invoke(entity, kind) }
+                    )
                     .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -462,6 +446,7 @@ fun EntityTreeItem(
                                 dailyRms = dailyRms,
                                 showRmInfo = showRmInfo,
                                 onEdit = onEdit,
+                                onLongPress = onLongPress,
                                 actionContent = actionContent,
                                 adjustmentAccum = effectiveAccum,
                                 subAdjustment = childSubAdj
