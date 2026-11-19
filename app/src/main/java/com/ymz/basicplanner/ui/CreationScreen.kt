@@ -496,12 +496,18 @@ fun CreationScreen(
         val kind = moduleTargetKindOf(pressedKind)
         val attached = if (kind == null) emptyList() else creationState.moduleAttachments
             .filter { it.targetKind == kind && it.targetId == pressed.id }
-            .mapNotNull { attachment -> creationState.modules.find { it.id == attachment.moduleId } }
+            .mapNotNull { attachment ->
+                creationState.modules.find { it.id == attachment.moduleId }?.let { attachment to it }
+            }
 
         EntityActionDialog(
             entityLabel = pressed.name.ifBlank { pressedKind.moduleLabel() },
             kindLabel = pressedKind.moduleLabel(),
-            modules = attached,
+            attachments = attached,
+            onDelete = { attachment ->
+                creationState.moduleAttachments.remove(attachment)
+                scope.launch { AppStateStore.save(context, creationState.toAppState()) }
+            },
             onAddModule = {
                 modulePickerFor = Triple(pressed, pressedKind, scopeRoot)
                 entityAction = null

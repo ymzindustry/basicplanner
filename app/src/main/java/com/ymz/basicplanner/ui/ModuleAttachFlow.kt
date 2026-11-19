@@ -1,6 +1,8 @@
 package com.ymz.basicplanner.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -187,57 +189,146 @@ fun entitiesOfProgram(
 // ---------------------------------------------------------------- dialogs
 
 /**
- * The long-press dialog: the modules already attached to this entity, and the way to add another.
+ * A rounded rectangle with a semicircular hole punched into its top edge, left side. It is the
+ * module row's signature shape: the outline itself says "this is a module line".
+ */
+class ModuleRowShape(
+    private val cornerDp: Float = 10f,
+    private val holeDp: Float = 15f
+) : androidx.compose.ui.graphics.Shape {
+    override fun createOutline(
+        size: androidx.compose.ui.geometry.Size,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        density: androidx.compose.ui.unit.Density
+    ): androidx.compose.ui.graphics.Outline {
+        val r = with(density) { cornerDp.dp.toPx() }
+        val s = with(density) { holeDp.dp.toPx() }
+        val h = size.height
+        val holeCx = r + s
+        val path = androidx.compose.ui.graphics.Path()
+        path.moveTo(r, 0f)
+        path.lineTo(holeCx - s, 0f)
+        path.arcTo(androidx.compose.ui.geometry.Rect(holeCx - s, -s, holeCx + s, s), 180f, -180f, false)
+        path.lineTo(size.width - r, 0f)
+        path.quadraticTo(size.width, 0f, size.width, r)
+        path.lineTo(size.width, h - r)
+        path.quadraticTo(size.width, h, size.width - r, h)
+        path.lineTo(r, h)
+        path.quadraticTo(0f, h, 0f, h - r)
+        path.lineTo(0f, r)
+        path.quadraticTo(0f, 0f, r, 0f)
+        path.close()
+        return androidx.compose.ui.graphics.Outline.Generic(path)
+    }
+}
+
+/**
+ * The long-press dialog: the entity's name, the modules attached to it, and the way to add another.
  * Adjustments are not here — they live in the entity's own edit dialog.
  */
 @Composable
 fun EntityActionDialog(
     entityLabel: String,
     kindLabel: String,
-    modules: List<ModuleDefinition>,
+    attachments: List<Pair<ModuleAttachment, ModuleDefinition>>,
+    onDelete: (ModuleAttachment) -> Unit,
     onAddModule: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var expandedId by remember { mutableStateOf<Long?>(null) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(),
         containerColor = DarkSurfaceAlt,
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextMuted) } },
+        dismissButton = {},
         title = {
             Column {
-                Text("Add module", color = TextPrimary, fontWeight = FontWeight.Bold)
-                Text("$entityLabel · $kindLabel", color = TextMuted, fontSize = 11.sp)
+                Text(entityLabel, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(kindLabel, color = TextMuted, fontSize = 10.sp)
             }
         },
         text = {
             Column {
-                if (modules.isNotEmpty()) {
-                    modules.forEach { module ->
-                        Text(
-                            text = highlightPython(
-                                "def " + ModuleDefinition.pythonFunctionName(module.name) +
-                                    "(" + ModuleDefinition.pythonParameterName(module.itemName) + "):"
-                            ),
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                Text("modules :", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+
+                if (attachments.isEmpty()) {
+                    Text("vide", color = TextMuted.copy(alpha = 0.55f), fontSize = 12.sp)
+                } else {
+                    attachments.forEach { (attachment, module) ->
+                        val open = expandedId == attachment.id
+                        Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .background(androidx.compose.ui.graphics.Color.Transparent, ModuleRowShape())
+                                    .border(1.dp, AccentOrange.copy(alpha = 0.6f), ModuleRowShape())
+                                    .padding(start = 14.dp, end = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = highlightPython(
+                                        "def " + ModuleDefinition.pythonFunctionName(module.name) +
+                                            "(" + ModuleDefinition.pythonParameterName(module.itemName) + ")"
+                                    ),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    Icons.Default.DeleteOutline,
+                                    contentDescription = "remove module",
+                                    tint = AccentRed.copy(alpha = 0.8f),
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clickable { onDelete(attachment) }
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = if (open) Icons.Default.ArrowDropDown
+                                    else Icons.AutoMirrored.Filled.ArrowRight,
+                                    contentDescription = "unfold",
+                                    tint = TextMuted,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { expandedId = if (open) null else attachment.id }
+                                )
+                            }
+                            if (open) {
+                                Column(Modifier.fillMaxWidth().padding(start = 14.dp, top = 6.dp)) {
+                                    moduleFunctionBody(module.code).lines().forEach { line ->
+                                        Text(
+                                            text = highlightPython(line.ifEmpty { " " }),
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            lineHeight = 15.sp,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
-                    Spacer(Modifier.height(6.dp))
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(AccentOrange.copy(alpha = 0.12f))
-                        .clickable(onClick = onAddModule)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("+ Add module", color = AccentOrange, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Text(
+                        text = "Add module",
+                        color = AccentOrange,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable(onClick = onAddModule)
+                            .padding(vertical = 8.dp, horizontal = 2.dp)
+                    )
                 }
             }
         }
